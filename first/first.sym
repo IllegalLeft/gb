@@ -1,6 +1,0 @@
-; this file was created with wlalink by ville helin <vhelin@iki.fi>.
-; no$gmb symbolic information for "first.gb".
-0000:0150 Start
-0000:0154 Loop
-0000:0061 SCREEN_OFF
-0000:0041 SCREEN_ON

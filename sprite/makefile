@@ -1,13 +1,13 @@
 TARGET	 = sprite.gb
-CC		 = wla-gb
+CC	 = wla-gb
 CFLAGS	 = -ox
-LD		 = wlalink
+LD	 = wlalink
 LDFLAGS	 = -s
 
 LINKFILE = linkfile
-SFILES = main.s
-IFILES = nintendo_logo.i
-OFILES = main.o
+SFILES 	= main.s
+IFILES 	= nintendo_logo.i
+OFILES 	= main.o
 
 .PHONY: default all clean
 .PRECIOUS: $(TARGET) $(OBJECTS)
