@@ -1,0 +1,6 @@
+# Compilation files
+*.o
+*.sym
+
+# Gameboy
+*.sav
