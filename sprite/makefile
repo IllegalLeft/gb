@@ -1,34 +1,28 @@
 TARGET	 = sprite.gb
-CC	 = wla-gb
-CFLAGS	 = -ox
+AS	 = wla-gb
+ASFLAGS	 = -ox
 LD	 = wlalink
-LDFLAGS	 = -s
+LDFLAGS	 = -vs
 
 LINKFILE = linkfile
-SFILES 	= main.s
-IFILES 	= nintendo_logo.i
-OFILES 	= main.o
+SFILES	= $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
+OFILES 	= $(patsubst %.s, %.o, $(wildcard *.s))
 
 .PHONY: default all clean
 .PRECIOUS: $(TARGET) $(OBJECTS)
 
 
 default: $(TARGET)
-
-
-all: $(OFILES) makefile
-	$(LD) $(LDFLAGS) $(LINKFILE) $(TARGET)
-
-main.o: main.s nintendo_logo.i
-	$(CC) $(CFLAGS) main.s main.o
-
+all: default
 
 $(TARGET): $(OFILES)
 	$(LD) $(LDFLAGS) $(LINKFILE) $@
 
-$(OFILES): $(HFILES)
+%.o: %.s
+	$(AS) $(ASFLAGS) $< $@
+
 
 clean:
-	-rm -f *.o
 	-rm -f $(TARGET)
+	-rm -f *.o
 	-rm -f *.sym
