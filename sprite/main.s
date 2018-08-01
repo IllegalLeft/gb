@@ -8,21 +8,26 @@
 ;
 ;==============================================================================
 
-.ROMBANKSIZE $4000
-.ROMBANKS 2
-.CARTRIDGETYPE 0
-
-.COMPUTEGBCHECKSUM
-.COMPUTEGBCOMPLEMENTCHECK
+.GBHEADER
+    NAME "SAM SPRITE"
+    CARTRIDGETYPE $00	; RAM only
+    RAMSIZE $00		; 32KByte, no ROM banking
+    COUNTRYCODE $01	; outside Japan
+    NINTENDOLOGO
+    LICENSEECODENEW "SV"
+    ROMDMG		; DMG rom
+.ENDGB
 
 .MEMORYMAP
-DEFAULTSLOT 0
-SLOTSIZE $4000
-SLOT 0 $0000
-SLOT 1 $4000
+    DEFAULTSLOT 0
+    SLOTSIZE $4000
+    SLOT 0 $0000
+    SLOT 1 $4000
 .ENDME
 
-.INCLUDE "nintendo_logo.i"
+.ROMBANKSIZE $4000
+.ROMBANKS 2
+
 
 ;==============================================================================
 ; GAMEBOY HEADER
@@ -59,67 +64,22 @@ SLOT 1 $4000
 .ORG $100   ; Code Execution Start
     nop
     jp Start
-;.ORG $104   ; Nintendo Logo
-;   .DB $CE,$ED,$66,$66,$CC,$0D,$00,$0B,$03,$73,$00,$83,$00,$0C,$00,$0D
-;   .DB $00,$08,$11,$1F,$88,$89,$00,$0E,$DC,$CC,$6E,$E6,$DD,$DD,$D9,$99
-;   .DB $BB,$BB,$67,$63,$6E,$0E,$EC,$CC,$DD,$DC,$99,$9F,$BB,$B9,$33,$3E
-.ORG $134   ; Game Title
-    .DB "SAM SPRITE"
-.ORG $13F   ; Product code
-    .DB "    "
-.ORG $143   ; Color Gameboy compatibility code
-    .DB $01
-.ORG $144   ; Licence code
-    .DB $00,$00
-
-.ORG $146   ; Gameboy indicator
-    .DB $00 ; $00 - GameBoy
-.ORG $147   ; Cartridge type
-    .DB $00 ; $00 - ROM Only
-.ORG $148   ; ROM Size
-    .DB $00
-.ORG $149   ; RAM Size
-    .DB $00 ; $00 - None
-
-.ORG $14A   ; Destination code
-    .DB $01 ; $01 - non-japanese
-.ORG $14B
-    .DB $33 ; $33 - Check $0144/$0145 for Licensee code.
-
-; $014C (Mask ROM version - handled by RGBFIX)
-.ORG $14C
-    .DB $00
-
-; $014D (Complement check - handled by RGBFIX)
-;.ORG $14D
-;   .DB $00
-
-; $014E-$014F (Cartridge checksum - handled by RGBFIX)
-;   .DW $00
-
 
 ;==============================================================================
 ; CODE
 ;==============================================================================
 
-; OAM BLOCK:
-; byte0 - Ypos
-; byte1 - Xpos
-; byte2 - Pattern #
-; byte3 - Flags:
-;           bit7 - priority
-;           bit6 - Yflip
-;           bit5 - Xflip
-;           bit4 - Palette#
-;
-
 .ORG $150
 Start:
     di
     ld sp, $FFFE        ; setup stack
-    call SCREEN_OFF
 
+    ;ld a, 0
+    ;ldh ($26), 0    ; sound off
+
+    call ScreenOff
     call BlankSprites
+    call BlankOAM
 
     ; OBJ0 Palette
     ld a, %11100100
@@ -141,10 +101,14 @@ Start:
     ; Setup screen
     ld a, %10000010
     ldh ($40), a    ; $FF40 LCDC status
+    
+    ; set interrupts up
+    ld a, %00000001 ; vblank
+    ldh ($FF), a
     ei
 
 GameLoop:
-    ;halt ; TODO: this doesn't seem to help anything
+    halt
     nop
 
     call ReadDpad
@@ -158,6 +122,11 @@ GameLoop:
 ;==============================================================================
 ; SUBROUTINES
 ;==============================================================================
+
+ScreenOff:
+    ld a, 0
+    ldh ($40), a
+    ret
 
 ReadDpad:
     ld a, $20       ; select P14
@@ -248,6 +217,16 @@ LoadSpritesLoop:
     jp nz, LoadSpritesLoop  ; if b|c != 0...
     ret
 
+BlankOAM
+    ld hl, $FE00
+    ld bc, 40*4
+-   ld a, 0
+    ldi (hl), a
+    dec bc
+    ld a, b
+    or c
+    jp nz, -
+    ret
 
 
 ;==============================================================================
