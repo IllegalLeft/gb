@@ -1,3 +1,4 @@
+
 ;==============================================================================
 ;
 ; RUN
@@ -7,17 +8,17 @@
 ; Culmination of sprite work and background scrolling to show an animal
 ; running.
 ;
+;
 ;==============================================================================
 
 .GBHEADER
     NAME "RUN"
     CARTRIDGETYPE $00 ; RAM only
-    RAMSIZE $00 ;32KByte, no ROM banking
+    RAMSIZE $00 ; 32KByte, no ROM banking
     COUNTRYCODE $01 ; outside Japan
     NINTENDOLOGO
     LICENSEECODENEW "SV"
     ROMDMG  ; DMG rom
-
 .ENDGB
 
 
@@ -35,9 +36,13 @@
 .DEFINE DogeX $C000
 .DEFINE DogeY $C001
 .DEFINE DogeFrame $C002
-.DEFINE MapX $C005
-.DEFINE MapY $C004
+.DEFINE MapX $C004
+.DEFINE MapY $C005
+.DEFINE CloudX $C006
+.DEFINE CloudY $C007
+
 .DEFINE Doge $C100  ; OAM for doge
+.DEFINE Cloud Doge+(16*4)   ; OAM for cloud
 
 ;==============================================================================
 ; GAMEBOY HEADER
@@ -79,10 +84,9 @@ CopyData:
     reti
 
 .ORG $30    ; Reset $30
-    ;jp $100
+    ;jp $100	; is overwritten above
 .ORG $38    ; Reset $38
-    ;jp $100
-
+    ;jp $100	; is overwritten above
 .ORG $40    ; Vblank IRQ Vector
     reti
 .ORG $48    ; LCD IRQ Vector
@@ -117,7 +121,7 @@ BlankSprites:
     jp nz, -
     ret
 
-BlankOAM
+BlankOAM:
     ld hl, Doge
     ld bc, 160	; entries
 -   ld a, 0
@@ -204,6 +208,28 @@ DMACopy:
 
 
 ; Sprite Subroutines
+InitDoge:   ; setup oam in wram for doge sprites
+    xor a
+    ld (DogeFrame), a
+    ld a, 72
+    ld (DogeX), a
+    ld a, 90
+    ld (DogeY), a
+    ; tile numbers
+    ld hl, Doge+2   ; first tile number of first sprite
+    ld b, 16	    ; 16 sprites total
+    ld c, $10	    ; tile starts at x and goes up from there
+    ld de, 4
+-   ld (hl), c
+    add hl, de
+    dec b
+    inc c
+    ld a, 0
+    cp b
+    jp nz, -
+    ret
+
+
 MoveDoge:   ; modifies doge OAM x & Ys 
     ; Y ordinates
     ld hl, Doge     ; OAM in WRAM
@@ -264,9 +290,9 @@ ChangeX:
     ld c, 32
     sub c
     ld c, a
-noChangeX
+noChangeX:
     xor a
-    or c
+    or b
     jp nz, -
     ret
 
@@ -284,7 +310,6 @@ frame0:
 frame1:
     ld hl, doge_map_data2
 
-
 +   ; set tiles up
     ld de, Doge+2   ; tile # of first sprite
     ld bc, 16	    ; 16 sprites to modify
@@ -299,6 +324,76 @@ frame1:
     ld a, b
     or c
     jp nz, -
+    ret
+
+InitCloud:
+    xor a
+    ld a, 20
+    ld (CloudX), a
+    ld (CloudY), a
+    ; set up tiles
+    ld bc, cloud_tile_count ; num of tiles
+    ld de, Cloud+2	    ; cloud oam tile # in wram
+    ld hl, cloud_map_data   ; map data
+-   ldi a, (hl)
+    add $30
+    ld (de), a
+    ld a, 4	; de+4
+    add e	; ...
+    ld e, a	; ...
+    dec bc
+    ld a, c
+    or b
+    jp nz, -
+    ret
+
+MoveCloud:
+    ld a, (DogeFrame)
+    and %0001
+    jp z, +
+    ld a, (CloudX)
+    dec a
+    ld (CloudX), a
+
++   ; move sprites for the cloud based off of the coordinates
+    ; y ordinate
+    ld hl, Cloud    ; cloud oam in wram
+    ld de, 4	    ; y ordinates are 4 away from eachother
+    ld a, (CloudY)  ; starting y ordinate
+    ld c, a
+    ld (hl), c	    ; first sprite
+    add hl, de
+    ld (hl), c	    ; second sprite
+    add hl, de
+    ld a, 8
+    add c
+    ld c, a
+    ld (hl), c	    ; third sprite
+    add hl, de
+    ld (hl), c	    ; fourth
+
+    ; x ordinate
+    ld hl, Cloud+1  ; cloud oam in wram
+    ld de, 4	    ; y ordinates are 4 away from eachother
+    ld a, (CloudX)  ; starting y ordinate
+    ld c, a
+    ld (hl), c	    ; first sprite
+    add hl, de
+    ld a, 8
+    add c
+    ld c, a
+    ld (hl), c	    ; second sprite
+    add hl, de
+    ld a, c
+    ld c, 8
+    sub c
+    ld c, a
+    ld (hl), c	    ; third sprite
+    add hl, de
+    ld a, 8
+    add c
+    ld c, a
+    ld (hl), c	    ; fourth
     ret
     
 
@@ -323,13 +418,27 @@ Start:
     call BlankSprites
     call LoadTiles
 
+    ; load dog tiles
     ld hl, doge_tile_data
     ld de, $8100
     ld bc, doge_tile_data_size
     call MoveData
 
+    ; load cloud data
+    ld hl, cloud_tile_data
+    ld de, $8300
+    ld bc, cloud_tile_data_size
+    call MoveData
+
+    ;grass data
+    ld hl, grass_tile_data
+    ld de, $8340
+    ld bc, $10
+    call MoveData
+
     call BlankMap
     call LoadMap
+
     ; load palette
     ld a, %11100100	; bg
     ldh ($47), a
@@ -338,27 +447,11 @@ Start:
 
     call DMACopy ; set up DMA subroutine
 
-    ; setup doge OAM
-    xor a
-    ld (DogeFrame), a
-    ld a, 72
-    ld (DogeX), a
-    ld a, 90
-    ld (DogeY), a
-    ; tile numbers
-    ld hl, Doge+2   ; first tile number of first sprite
-    ld b, 16	    ; 16 sprites total
-    ld c, $10	    ; tile starts at x and goes up from there
-    ld de, 4
--   ld (hl), c
-    add hl, de
-    dec b
-    inc c
-    ld a, 0
-    cp b
-    jp nz, -
-
+    call InitDoge
     call MoveDoge
+
+    call InitCloud
+    call MoveCloud
     
     ; setup screen
     ld a, %10010011
@@ -375,6 +468,7 @@ MainLoop:
     ldh ($43), a
 
     ;call MoveDoge
+    call MoveCloud
     call DogeAnim
 
     jp MainLoop
@@ -513,3 +607,23 @@ bg_tile_data:
 .DB $FF,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF
 .DB $00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF
 
+grass_tile_data:
+.DB $00,$00,$82,$00,$64,$00,$24,$00,$14,$00,$54,$00,$55,$00,$00,$00
+
+.DEFINE cloud_tile_map_size $04
+.DEFINE cloud_tile_map_width $02
+.DEFINE cloud_tile_map_height $02
+
+.DEFINE cloud_tile_data_size $40
+.DEFINE cloud_tile_count $04
+
+cloud_map_data:
+.DB $00,$01,$02,$03
+
+cloud_tile_data:
+.DB $00,$00,$00,$00,$00,$00,$00,$00,$00,$06,$0F,$10,$1F,$20,$3D,$42
+.DB $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$80,$40,$C0,$30,$D4,$2A
+.DB $7A,$85,$15,$6A,$00,$1F,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+.DB $A9,$57,$44,$BC,$60,$E0,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+
+; vim: filetype=wla
