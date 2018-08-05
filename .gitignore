@@ -1,3 +1,6 @@
+# Vim files
+*.swp
+
 # Compilation files
 *.o
 *.sym
