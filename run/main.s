@@ -38,11 +38,14 @@
 .DEFINE DogeFrame $C002
 .DEFINE MapX $C004
 .DEFINE MapY $C005
-.DEFINE CloudX $C006
-.DEFINE CloudY $C007
+.DEFINE CloudY $C006
+.DEFINE CloudX $C007
+.DEFINE Cloud2Y $C008
+.DEFINE Cloud2X $C009
 
 .DEFINE Doge $C100  ; OAM for doge
 .DEFINE Cloud Doge+(16*4)   ; OAM for cloud
+.DEFINE Cloud2 Cloud+(4*4)  ; OAM for cloud2
 
 ;==============================================================================
 ; GAMEBOY HEADER
@@ -124,6 +127,16 @@ BlankSprites:
 BlankOAM:
     ld hl, Doge
     ld bc, 160	; entries
+-   ld a, 0
+    ldi (hl), a
+    dec bc
+    ld a, b
+    or c
+    jp nz, -
+
+BlankWRAM:
+    ld hl, $C000    ; WRAM
+    ld bc, $2000    ; counter
 -   ld a, 0
     ldi (hl), a
     dec bc
@@ -326,12 +339,19 @@ frame1:
     jp nz, -
     ret
 
-InitCloud:
-    xor a
-    ld a, 20
+InitClouds:
+    ; set initial coordinates of clouds
+    ld a, 8
     ld (CloudX), a
+    ld a, 20
     ld (CloudY), a
+    ld a, 40
+    ld (Cloud2Y), a
+    ld a, 160
+    ld (Cloud2X), a
+
     ; set up tiles
+    ; cloud 1
     ld bc, cloud_tile_count ; num of tiles
     ld de, Cloud+2	    ; cloud oam tile # in wram
     ld hl, cloud_map_data   ; map data
@@ -345,21 +365,43 @@ InitCloud:
     ld a, c
     or b
     jp nz, -
+
+    ; cloud 2
+    ld bc, cloud_tile_count ; num of tiles
+    ld de, Cloud2+2	    ; cloud oam tile # in wram
+    ld hl, cloud_map_data   ; map data
+-   ldi a, (hl)
+    add $30
+    ld (de), a
+    ld a, 4	; de+4
+    add e	; ...
+    ld e, a	; ...
+    dec bc
+    ld a, c
+    or b
+    jp nz, -
+
     ret
 
 MoveCloud:
+    ; hl = cloudX
     ld a, (DogeFrame)
     and %0001
     jp z, +
-    ld a, (CloudX)
+    ld a, (hl)
     dec a
-    ld (CloudX), a
+    ld (hl), a
++   ret
 
-+   ; move sprites for the cloud based off of the coordinates
+UpdateCloud:
+    ; move sprites for the cloud based off of the coordinates
+    push de
+    push hl
+    ld a, (de)
     ; y ordinate
-    ld hl, Cloud    ; cloud oam in wram
+    ;ld hl, Cloud    ; cloud oam in wram
     ld de, 4	    ; y ordinates are 4 away from eachother
-    ld a, (CloudY)  ; starting y ordinate
+    ;ld a, (CloudY)  ; starting y ordinate
     ld c, a
     ld (hl), c	    ; first sprite
     add hl, de
@@ -373,9 +415,14 @@ MoveCloud:
     ld (hl), c	    ; fourth
 
     ; x ordinate
-    ld hl, Cloud+1  ; cloud oam in wram
-    ld de, 4	    ; y ordinates are 4 away from eachother
-    ld a, (CloudX)  ; starting y ordinate
+    pop hl
+    pop de
+    inc hl	; x is +1 from y ordinate in oam
+    inc de	; x ord is +1 from y
+    ld a, (de)
+    ;ld hl, Cloud+1  ; cloud oam in wram
+    ld de, 4	    ; x ordinates are 4 away from eachother
+    ;ld a, (CloudX)  ; starting x ordinate
     ld c, a
     ld (hl), c	    ; first sprite
     add hl, de
@@ -414,6 +461,7 @@ Start:
     xor a
     ldh ($26), a
 
+    call BlankWRAM
     call BlankOAM
     call BlankSprites
     call LoadTiles
@@ -450,8 +498,17 @@ Start:
     call InitDoge
     call MoveDoge
 
-    call InitCloud
+    call InitClouds
+    ld hl, CloudX
     call MoveCloud
+    ld hl, Cloud2X
+    call MoveCloud
+    ld hl, Cloud
+    ld de, CloudY
+    call UpdateCloud
+    ld hl, Cloud2
+    ld de, Cloud2Y
+    call UpdateCloud
     
     ; setup screen
     ld a, %10010011
@@ -467,8 +524,16 @@ MainLoop:
     inc a
     ldh ($43), a
 
-    ;call MoveDoge
+    ld hl, CloudX
     call MoveCloud
+    ld hl, Cloud2X
+    call MoveCloud
+    ld hl, Cloud
+    ld de, CloudY
+    call UpdateCloud
+    ld hl, Cloud2
+    ld de, Cloud2Y
+    call UpdateCloud
     call DogeAnim
 
     jp MainLoop
