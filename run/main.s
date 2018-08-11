@@ -42,10 +42,18 @@
 .DEFINE CloudX $C007
 .DEFINE Cloud2Y $C008
 .DEFINE Cloud2X $C009
+.DEFINE GrassY $C00A
+.DEFINE GrassX $C00B
+.DEFINE Grass2Y $C00C
+.DEFINE Grass2X $C00D
+.DEFINE Grass3Y	$C00E
+.DEFINE Grass3X	$C00F
 
-.DEFINE Doge $C100  ; OAM for doge
-.DEFINE Cloud Doge+(16*4)   ; OAM for cloud
-.DEFINE Cloud2 Cloud+(4*4)  ; OAM for cloud2
+; WRAM Addresses for specifc OAMs
+.DEFINE Doge $C100
+.DEFINE Cloud Doge+(16*4) 
+.DEFINE Cloud2 Cloud+(4*4)
+.DEFINE Grass Cloud2+(4*4)
 
 ;==============================================================================
 ; GAMEBOY HEADER
@@ -443,6 +451,88 @@ UpdateCloud:
     ld (hl), c	    ; fourth
     ret
     
+InitGrass:
+    ; set initial coordinates
+    ; grass1
+    xor a
+    ld (GrassX), a
+    ld a, 133
+    ld (GrassY), a
+    ; grass2
+    ld a, 200
+    ld (Grass2X), a
+    ld a, 110
+    ld (Grass2Y), a
+    ; grass3
+    ld a, 100
+    ld (Grass3X), a
+    ld a, 140
+    ld (Grass3Y), a
+
+    ; set up OAM tile numbers
+    ld hl, Grass+2  ; start of wram oam tile numbers
+    ld c, 3	    ; how many grasses
+    ld de, 4	    ; every 4th tile
+-   ld a, $34	    ; tile number
+    ld (hl), a
+    add hl, de
+    dec c
+    xor a
+    cp c
+    jp nz, -
+    ret
+    
+
+MoveGrass:
+    ld b, 2 ; grass moves 2 per frame
+    ; grass 1
+    ld a, (GrassX)
+    sub b
+    ld (GrassX), a
+    ; grass 2
+    ld a, (Grass2X)
+    sub b
+    ld (Grass2X), a
+    ; grass 3
+    ld a, (Grass3X)
+    sub b
+    ld (Grass3X), a
+    ret
+
+
+UpdateGrass:
+    ; Y Ordinate
+    ld hl, GrassY   ; start of grass Ys
+    ld c, 3	    ; 3 grasses
+    ld de, Grass+0  ; grass OAM in WRAM
+-   ldi a, (hl)
+    ld (de), a
+    inc hl	    ; next grass y is +2 from first one
+    ld a, 4
+    add e
+    ld e, a
+    dec c
+    xor a
+    cp c
+    jp nz, -
+
+    ; X ordinate
+    ld hl, GrassX   ; start of grass Xs
+    ld c, 3	    ; 3 grasses
+    ld de, Grass+1  ; grass OAM in WRAM
+-   ldi a, (hl)
+    ld (de), a
+    inc hl	    ; next grass x is +2 from first one
+    ld a, 4
+    add e
+    ld e, a
+    dec c
+    xor a
+    cp c
+    jp nz, -
+    ret
+
+    
 
 ;==============================================================================
 ; START
@@ -495,9 +585,11 @@ Start:
 
     call DMACopy ; set up DMA subroutine
 
+    ; doge
     call InitDoge
     call MoveDoge
 
+    ; clouds
     call InitClouds
     ld hl, CloudX
     call MoveCloud
@@ -509,6 +601,11 @@ Start:
     ld hl, Cloud2
     ld de, Cloud2Y
     call UpdateCloud
+
+    ; grass
+    call InitGrass
+    call MoveGrass
+    call UpdateGrass
     
     ; setup screen
     ld a, %10010011
@@ -534,6 +631,10 @@ MainLoop:
     ld hl, Cloud2
     ld de, Cloud2Y
     call UpdateCloud
+
+    call MoveGrass
+    call UpdateGrass
+
     call DogeAnim
 
     jp MainLoop
@@ -673,7 +774,9 @@ bg_tile_data:
 .DB $00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF
 
 grass_tile_data:
-.DB $00,$00,$82,$00,$64,$00,$24,$00,$14,$00,$54,$00,$55,$00,$00,$00
+;.DB $00,$00,$82,$00,$64,$00,$24,$00,$14,$00,$54,$00,$55,$00,$00,$00
+;.DB $00,$00,$82,$82,$64,$64,$24,$24,$14,$14,$54,$54,$55,$55,$00,$00
+.DB $00,$00,$82,$82,$64,$64,$34,$34,$15,$15,$55,$55,$84,$84,$80,$80
 
 .DEFINE cloud_tile_map_size $04
 .DEFINE cloud_tile_map_width $02
