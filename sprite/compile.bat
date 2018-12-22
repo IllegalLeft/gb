@@ -1,3 +1,3 @@
 wla-gb -x -o main.o main.s
-wlalink -v linkfile sprite.gb
+wlalink -S -s -v linkfile sprite.gb
 pause
