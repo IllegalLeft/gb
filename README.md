@@ -2,8 +2,7 @@
 This is just some collection of random GameBoy programs I've programmed. Nothing too amazing really.
 
 ## Requirements
-To compile these, you will need a few things:
-* make
+To compile the roms, you will need a few things:
 * WLA-GB assembler
 
 ## Pre-compiled ROMs
