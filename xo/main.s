@@ -49,6 +49,16 @@
 .DEFINE joypadStateOld $FF8E
 .DEFINE joypadStateDiff $FF8F
 
+.DEFINE numberOffset	$64
+.DEFINE alphaOffset	$6F
+
+.ASCIITABLE
+MAP "0" TO "9" = $64 ;numberOffset
+MAP "A" TO "Z" = alphaOffset
+MAP " " = $6E
+MAP "@" = $00
+.ENDA
+
 ;==============================================================================
 ; GAMEBOY HEADER
 ;==============================================================================
@@ -259,6 +269,59 @@ WaitVBlank:
     ld hl, $FF44
     ret
 
+FadePause:
+    ld a, 3
+-   halt
+    nop
+    dec a
+    jp nz, -
+    ret
+
+FadeIn:
+    ld a, %11111111
+    ldh ($47), a
+    call FadePause
+    ld a, %11111110
+    ldh ($47), a
+    call FadePause
+    ld a, %11111010
+    ldh ($47), a
+    call FadePause
+    ld a, %11100100
+    ldh ($47), a
+    call FadePause
+    ret
+
+FadeInRev:
+    ld a, %00000000
+    ldh ($47), a
+    call FadePause
+    ld a, %01000000
+    ldh ($47), a
+    call FadePause
+    ld a, %10010100
+    ldh ($47), a
+    call FadePause
+    ld a, %11100100
+    ldh ($47), a
+    call FadePause
+    ret
+
+FadeOut:
+    ld a, %11100100
+    ldh ($47), a
+    call FadePause
+    ld a, %11111001
+    ldh ($47), a
+    call FadePause
+    ld a, %11111110
+    ldh ($47), a
+    call FadePause
+    ld a, %11111111
+    ldh ($47), a
+    call FadePause
+    ret
+
 DMACopy:
     ; https://exez.in/gameboy-dma
     ld de, $FF80    ; destination of HRAM for DMA routine
@@ -349,6 +412,23 @@ PrintStr:
     ld (de), a
     inc de
     jp -
+
+PrintInt:
+    ; Prints 1 byte to VRAM tilemap three digits/tiles
+    ; a	    byte to print out
+    ; de    tile destination (somewhere in VRAM tilemap)
+    daa
+    ld b, a	    ; store for later
+    and $F0
+    swap a
+    add numberOffset
+    ld (de), a
+    inc de
+    ld a, b
+    and $0F	    ; bottom
+    add numberOffset
+    ld (de), a
+    ret
 
 
 ReadInput:
@@ -665,7 +745,7 @@ Start:
     call BlankMap
 
     ; load palette
-    ld a, %11100100	; bg
+    ld a, %00000000	; bg
     ldh ($47), a
     ld a, %11100100	; obj
     ldh ($48), a
@@ -706,8 +786,11 @@ SoftReset:
     ld de, tilemapbuff
     ld bc, turt_tile_map_size
     call MoveData
+
     call UpdateScreen
     call ScreenOn
+
+    call FadeInRev
 
 
 TitleScreen:
@@ -724,6 +807,7 @@ TitleScreen:
 
 
 GameSetup:
+    call FadeOut
     call ScreenOff
     call BlankMap
     call BlankSprites
@@ -748,7 +832,29 @@ GameSetup:
     ld hl, state
     ld (hl), 1		    ; x turn first
 
+    ; Score text
+    ld de, $9831
+    ld a, $85	    ; W
+    ld (de), a
+    ld a, (won)
+    ld de, $9832
+    call PrintInt
+    ld de, $9851
+    ld a, $82	    ; T
+    ld (de), a
+    ld a, (tied)
+    ld de, $9852
+    call PrintInt
+    ld de, $9871
+    ld a, $7A	    ; L
+    ld (de), a
+    ld a, (lost)
+    ld de, $9872
+    call PrintInt
+
     call ScreenOn
+
+    call FadeIn
 
 MainLoop:
     halt
@@ -795,7 +901,8 @@ EndGame:
 @won:
     ; increment wins
     ld a, (won)
-    inc a
+    adc 1
+    daa	; bcd is bae
     ld (won), a
     call WaitVBlank
     ld hl, TextWin
@@ -805,7 +912,8 @@ EndGame:
 @loss:
     ; increment losses
     ld a, (lost)
-    inc a
+    adc 1
+    daa
     ld (lost), a
     call WaitVBlank
     ld hl, TextLose
@@ -815,7 +923,8 @@ EndGame:
 @tie:
     ; increment ties
     ld a, (tied)
-    inc a
+    adc 1
+    daa
     ld (tied), a
     call WaitVBlank
     ld hl, TextTie
@@ -836,6 +945,7 @@ EndGame:
     ld a, (joypadStateDiff)
     and %00001111
     jp z, @endloop
+    call FadeOut
     jp SoftReset
 
 
@@ -871,12 +981,6 @@ Random:
 .DBRND 100, 0, 8
 
 ; Strings
-.ASCIITABLE
-MAP "0" TO "9" = $64
-MAP "A" TO "Z" = $6F
-MAP " " = $6E
-MAP "@" = $00
-.ENDA
 
 TextWin:
 .ASC "YOU WIN@"
