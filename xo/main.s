@@ -270,14 +270,14 @@ WaitVBlank:
     ret
 
 FadePause:
-    ld a, 3
+    ld a, 2
 -   halt
     nop
     dec a
     jp nz, -
     ret
 
-FadeIn:
+FadeInRev:
     ld a, %11111111
     ldh ($47), a
     call FadePause
@@ -292,7 +292,7 @@ FadeIn:
     call FadePause
     ret
 
-FadeInRev:
+FadeIn:
     ld a, %00000000
     ldh ($47), a
     call FadePause
@@ -308,6 +308,22 @@ FadeInRev:
     ret
 
 FadeOut:
+    ld a, %11100100
+    ldh ($47), a
+    call FadePause
+    ld a, %10100100
+    ldh ($47), a
+    call FadePause
+    ld a, %01010000
+    ldh ($47), a
+    call FadePause
+    ld a, %00000000
+    ldh ($47), a
+    call FadePause
+    ret
+
+
+FadeOutRev:
     ld a, %11100100
     ldh ($47), a
     call FadePause
@@ -791,7 +807,7 @@ SoftReset:
     call UpdateScreen
     call ScreenOn
 
-    call FadeInRev
+    call FadeIn
 
 
 TitleScreen:
