@@ -750,7 +750,8 @@ Start:
     ld a, %11100100	; obj
     ldh ($48), a
 
-    call DMACopy ; set up DMA subroutine
+    call DMACopy    ; set up DMA subroutine
+    call $FF80	    ; DMA routine in HRAM
 
     ; setup screen
     ld a, %00010011
@@ -774,8 +775,6 @@ SoftReset:
     dec c
     jp nz, -
 
-    call BlankOAM
-
     call ScreenOff
     ; load title screen
     ld hl, turt_tile_data
@@ -786,6 +785,8 @@ SoftReset:
     ld de, tilemapbuff
     ld bc, turt_tile_map_size
     call MoveData
+
+    call BlankOAM
 
     call UpdateScreen
     call ScreenOn
