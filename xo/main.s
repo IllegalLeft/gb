@@ -50,13 +50,13 @@
 .DEFINE joypadStateOld $FF8E
 .DEFINE joypadStateDiff $FF8F
 
-.DEFINE numberOffset	$64
-.DEFINE alphaOffset	$6F
+.DEFINE numberOffset	$80
+.DEFINE alphaOffset	numberOffset+11
 
 .ASCIITABLE
-MAP "0" TO "9" = $64 ;numberOffset
+MAP "0" TO "9" = numberOffset
 MAP "A" TO "Z" = alphaOffset
-MAP " " = $6E
+MAP " " = $8A
 MAP "@" = $00
 .ENDA
 
@@ -231,6 +231,7 @@ LoadScreen:
     ret
 
 UpdateScreen:
+    ; moves tilemapbuff to VRAM
     ld hl, tilemapbuff
     ld de, $9800
     ld c, $12
@@ -422,7 +423,7 @@ CursorUpdate:
 PrintStr:
     ; Prints $00 terminated string to VRAM tile map.
     ; hl    source of string ending in $00
-    ; de    tile destination (somewhere in VRAM tilemap)
+    ; de    tile destination (somewhere in VRAM tilemap probably)
 -   ldi a, (hl)
     cp 0
     ret z
@@ -800,6 +801,11 @@ SoftReset:
     ld (cursory), a
 
     call ScreenOff
+    ; font tiles
+    ld hl, Tiles
+    ld de, $8800
+    ld bc, TileCount
+    call MoveData
     ; load title screen
     ld hl, turt_tile_data
     ld de, $8000
@@ -809,6 +815,15 @@ SoftReset:
     ld de, tilemapbuff
     ld bc, turt_tile_map_size
     call MoveData
+
+    ; Turtle Tic Tac Toe
+    ld hl, TextTitle
+    ld de, tilemapbuff+($14*$1)+$1
+    call PrintStr
+    ; Press Start
+    ld hl, TextStart
+    ld de, tilemapbuff+($14*$10)+$4
+    call PrintStr
 
     call BlankOAM
 
@@ -844,12 +859,13 @@ GameSetup:
     ld de, $8500
     ld bc, cursor_tile_data_size
     call MoveData
-    ld hl, Tiles
-    ld de, $8600
-    ld bc, TileCount
-    call MoveData
     ld hl, shell_map_data
     call LoadScreen
+    ; font tiles
+    ld hl, Tiles
+    ld de, $8800
+    ld bc, TileCount
+    call MoveData
 
     call InitCursor
     call CursorUpdate
@@ -864,19 +880,19 @@ GameSetup:
 
     ; Score text
     ld de, $9831
-    ld a, $85	    ; W
+    ld a, $A1	    ; W
     ld (de), a
     ld a, (won)
     ld de, $9832
     call PrintInt
     ld de, $9851
-    ld a, $82	    ; T
+    ld a, $9E	    ; T
     ld (de), a
     ld a, (tied)
     ld de, $9852
     call PrintInt
     ld de, $9871
-    ld a, $7A	    ; L
+    ld a, $96	    ; L
     ld (de), a
     ld a, (lost)
     ld de, $9872
@@ -984,11 +1000,6 @@ EndGame:
 ;==============================================================================
 .SECTION "Data" FREE
 Tiles:
-.DB $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-.DB $FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00
-.DB $00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF,$00,$FF
-.DB $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-
 .INCBIN "numbers.bin" FSIZE size_of_numbers
 .INCBIN "alphas.bin" FSIZE size_of_alphas
 
@@ -997,7 +1008,7 @@ Tiles:
 .INCLUDE "ox.i"
 .INCLUDE "cursor.i"
 
-.DEFINE TileCount   (4*16) + size_of_numbers + size_of_alphas
+.DEFINE TileCount   size_of_numbers + size_of_alphas
 
 .INCBIN "boot.bin"  FSIZE size_of_boot
 
@@ -1011,7 +1022,10 @@ Random:
 .DBRND 100, 0, 8
 
 ; Strings
-
+TextTitle:
+.ASC "TURTLE TIC TAC TOE@"
+TextStart:
+.ASC "PRESS  START@"
 TextWin:
 .ASC "YOU WIN@"
 TextLose:
