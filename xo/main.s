@@ -33,6 +33,7 @@
 ; WRAM Variables
 .ENUM $C000
     state	DB		; 0 main menu, 1 xturn, 2 oturn, 3 end game
+    initiator	DB		; holds player who started last
     won		DB
     lost	DB
     tied	DB
@@ -775,11 +776,13 @@ Start:
 
     ld hl, randoff   ; set random number offset
     ld (hl), 0
+    ld hl, initiator
+    ld (hl), 1
 
     call ScreenOn
     ei
 
-SoftReset:    
+SoftReset:
     ld hl, state
     ld (hl), $0	; main menu state
 
@@ -790,6 +793,11 @@ SoftReset:
 -   ldi (hl), a
     dec c
     jp nz, -
+
+    ; reset cursor to center
+    ld a, 1
+    ld (cursorx), a
+    ld (cursory), a
 
     call ScreenOff
     ; load title screen
@@ -846,8 +854,13 @@ GameSetup:
     call InitCursor
     call CursorUpdate
 
-    ld hl, state
-    ld (hl), 1		    ; x turn first
+    ; figure out who goes first
+    ld a, (initiator)
+    ld (state), a
+    dec a
+    jp nz, +
+    ld a, 2
++   ld (initiator), a
 
     ; Score text
     ld de, $9831
