@@ -40,7 +40,7 @@
     cursorx	DB		; 0-2
     cursory	DB		; 0-2
     field	DS	9	; field is 3x3, 0 empty, 1 x, 2 o
-    randoff	DB		; offset for new random number
+    seed	DB		; seed for randint generator
 .ENDE
 .ENUM $C200
     tilemapbuff	DS	20*18	; tilemap buffer
@@ -605,22 +605,20 @@ DrawFieldTile2:
     jp nz, -
     ret
 
-RandSpot:
-    ld a, (randoff)  ; move to next random number
-    inc a
-    cp 100
-    jp nz, +	    ; do we need to loop back to start?
-    xor a
-+   ld (randoff), a
-    ld d, 0
-    ld e, a
-    ld hl, Random
-    add hl, de 
-    ld a, (hl)	    ; load random number
+RandomInt:
+    ld a, (seed)
+    sla a
+    jp nc, +
+    xor %00011101
++   ld (seed), a
     ret
 
 CPUTurn:
--   call RandSpot   ; pick random spot
+-   ;call RandSpot   ; pick random spot
+    call RandomInt
+    and $0F
+    cp 9
+    jp nc, -
     ld hl, field    ; is it occupied?
     ld d, 0
     ld e, a
@@ -775,8 +773,10 @@ Start:
     ld a, %00010011
     ldh ($40), a
 
-    ld hl, randoff   ; set random number offset
-    ld (hl), 0
+    ; set random seed
+    ld a, 88
+    ld (seed), a
+    ; set starting player
     ld hl, initiator
     ld (hl), 1
 
@@ -852,6 +852,12 @@ GameSetup:
     call BlankMap
     call BlankSprites
 
+    ; font tiles
+    ld hl, Tiles
+    ld de, $8800
+    ld bc, TileCount
+    call MoveData
+
     ld hl, shell_tile_data
     ld bc, $420+16*12
     call LoadTiles
@@ -861,11 +867,6 @@ GameSetup:
     call MoveData
     ld hl, shell_map_data
     call LoadScreen
-    ; font tiles
-    ld hl, Tiles
-    ld de, $8800
-    ld bc, TileCount
-    call MoveData
 
     call InitCursor
     call CursorUpdate
@@ -921,16 +922,6 @@ MainLoop:
     ld a, (hl)
     cp 2		    ; is it the CPU's turn?
     call z, CPUTurn
-
-    ; primitive cursor coordinate display
-    ld a, (cursorx)
-    add $54
-    ld hl, $900A
-    ld (hl), a
-    ld a, (cursory)
-    add $54
-    ld hl, $900B
-    ld (hl), a
 
     jp MainLoop
 
@@ -1017,9 +1008,6 @@ FieldAddr:
 
 CursorPos:  ; yyxx
 .DW $3844, $385C, $3874, $5044, $505C, $5074, $6844, $685C, $6874
-
-Random:
-.DBRND 100, 0, 8
 
 ; Strings
 TextTitle:
