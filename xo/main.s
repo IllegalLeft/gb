@@ -173,6 +173,19 @@ LoadTiles:
     jp nz, -
     ret
 
+BlankData:
+    ; a	    value
+    ; hl    destination
+    ; bc    length/size
+    ld d, a	; will need to retrieve later
+-   ldi (hl), a
+    dec bc
+    ld a, b
+    or c
+    ld a, d
+    jp nz, -
+    ret
+
 MoveData:
     ;hl  source
     ;de  destination
@@ -229,6 +242,7 @@ LoadScreen:
     dec c
     jp nz, --
     ret
+
 
 UpdateScreen:
     ; moves tilemapbuff to VRAM
@@ -614,8 +628,7 @@ RandomInt:
     ret
 
 CPUTurn:
--   ;call RandSpot   ; pick random spot
-    call RandomInt
+-   call RandomInt  ; get a random spot
     and $0F
     cp 9
     jp nc, -
@@ -840,9 +853,11 @@ TitleScreen:
     call WaitVBlank
     call $FF80	    ; DMA routine in HRAM
     call ReadInput
+    ld a, (joypadStateNew)
+    cp %00000101
+    jp z, Credits
     ld a, (joypadStateDiff)
     and %00001000   ; start
-
     jp z, TitleScreen
 
 
@@ -907,7 +922,6 @@ MainLoop:
     halt
     nop
 
-    ;call WaitVBlank
     call $FF80		    ; DMA routine in HRAM
 
     call ReadInput
@@ -986,6 +1000,54 @@ EndGame:
     jp SoftReset
 
 
+Credits:
+    call FadeOut
+    call ScreenOff
+
+    call BlankMap
+    call BlankSprites
+    xor a
+    ld hl, tilemapbuff
+    ld bc, 20*18
+    call BlankData
+
+    ;font
+    ld hl, Tiles
+    ld de, $8800
+    ld bc, TileCount
+    call MoveData
+
+    ld hl, Credits1a
+    ld de, tilemapbuff + (2*$14) + 1
+    call PrintStr
+    ld hl, Credits1b
+    ld de, tilemapbuff + (4*$14) + 15
+    call PrintStr
+    ld hl, Credits2a
+    ld de, tilemapbuff + (10*$14) + 1
+    call PrintStr
+    ld hl, Credits2b
+    ld de, tilemapbuff + (12*$14) + 13
+    call PrintStr
+
+    call UpdateScreen
+
+    call ScreenOn
+    call FadeIn
+
+@loop:
+    halt
+    nop
+
+    call ReadInput
+    ld a, (joypadStateDiff)
+    and $FF
+    jp z, @loop
+
+    call FadeOut
+    jp SoftReset
+
+
 ;==============================================================================
 ; DATA
 ;==============================================================================
@@ -1020,6 +1082,15 @@ TextLose:
 .ASC "YOU LOSE@"
 TextTie:
 .ASC "YOU TIE@"
+
+Credits1a:
+.ASC "CODE AND ART@"
+Credits1b:
+.ASC "SAM@"
+Credits2a:
+.ASC "CONCEPT ART@"
+Credits2b:
+.ASC "HEIDI@"
 .ENDS
 
 ; vim: filetype=wla
