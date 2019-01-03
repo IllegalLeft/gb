@@ -42,13 +42,17 @@
     field	DS	9	; field is 3x3, 0 empty, 1 x, 2 o
     seed	DB		; seed for randint generator
 .ENDE
+; $C100 is OAM buffer
 .ENUM $C200
     tilemapbuff	DS	20*18	; tilemap buffer
 .ENDE
 
-.DEFINE joypadStateNew $FF8D
-.DEFINE joypadStateOld $FF8E
-.DEFINE joypadStateDiff $FF8F
+; HRAM constants
+.ENUM $FF8D	; before this is after the DMA routine
+    joypadStateNew	DB
+    joypadStateOld	DB
+    joypadStateDiff	DB
+.ENDE
 
 .DEFINE numberOffset	$80
 .DEFINE alphaOffset	numberOffset+11
@@ -272,17 +276,11 @@ ScreenOn:
     ret
 
 ScreenOff:
-    call WaitVBlank
+    halt    ; wait for VBlank
+    nop
     ldh a, ($40)
     xor %10000000
     ldh ($40), a
-    ret
-
-WaitVBlank:
-    ld a, ($FF44)
-    cp $91
-    jr nz, WaitVBlank
-    ld hl, $FF44
     ret
 
 FadePause:
@@ -602,7 +600,8 @@ DrawFieldTile2:
     jp ++
 +   ld b, empty_tile	; anything else will be empty
 ++
-    call WaitVBlank
+    halt    ; wait for VBlank
+    nop
     ld l, e
     ld h, d
     ld c, 4
@@ -759,7 +758,8 @@ Start:
     ldh ($FF), a
 
     ; wait for vblank
-    call WaitVBlank
+    halt
+    nop
     ; turn screen off
     call ScreenOff
 
@@ -850,7 +850,6 @@ TitleScreen:
     halt
     nop
 
-    call WaitVBlank
     call $FF80	    ; DMA routine in HRAM
     call ReadInput
     ld a, (joypadStateNew)
@@ -955,7 +954,8 @@ EndGame:
     adc 1
     daa	; bcd is bae
     ld (won), a
-    call WaitVBlank
+    halt    ; wait for VBlank
+    nop
     ld hl, TextWin
     ld de, $9826
     call PrintStr
@@ -966,7 +966,8 @@ EndGame:
     adc 1
     daa
     ld (lost), a
-    call WaitVBlank
+    halt    ; wait for VBlank
+    nop
     ld hl, TextLose
     ld de, $9826
     call PrintStr
@@ -977,14 +978,16 @@ EndGame:
     adc 1
     daa
     ld (tied), a
-    call WaitVBlank
+    halt    ; wait for VBlank
+    nop
     ld hl, TextTie
     ld de, $9826
     call PrintStr
 @end:
     ld de, $0000
     call CursorMove
-    call WaitVBlank
+    halt    ; wait for VBlank
+    nop
     call $FF80		    ; DMA routine in HRAM
 
 @endloop:
