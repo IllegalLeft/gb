@@ -10,27 +10,27 @@ I will include the latest compiled *.gb file but no guarantees that it will be t
 
 ## Screenshots
 
-###Bg
+### Bg
 Scrolling background demo.
 
 ![bg screenshot](bg/screenshot.bmp)
 
-###Run
+### Run
 Whippet runs along a beach!
 
 ![run screenshot](run/screenshot.bmp)
 
-###Sprite
+### Sprite
 Simple sprite on screen and D-pad moves it around.
 
 ![sprite screenshot](sprite/screenshot.bmp)
 
-###Text
+### Text
 Simple text demo.
 
 ![text screenshot](text/screenshot.bmp)
 
-###xo
+### XO
 Turtle Tic Tac Toe
 
 ![xo screenshot](xo/screenshot.bmp)
