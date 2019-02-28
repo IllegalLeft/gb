@@ -10,11 +10,6 @@ I will include the latest compiled *.gb file but no guarantees that it will be t
 
 ## Screenshots
 
-###Sprite
-Simple sprite on screen and D-pad moves it around.
-
-![sprite screenshot](sprite/screenshot.bmp)
-
 ###Bg
 Scrolling background demo.
 
@@ -24,6 +19,11 @@ Scrolling background demo.
 Whippet runs along a beach!
 
 ![run screenshot](run/screenshot.bmp)
+
+###Sprite
+Simple sprite on screen and D-pad moves it around.
+
+![sprite screenshot](sprite/screenshot.bmp)
 
 ###Text
 Simple text demo.
