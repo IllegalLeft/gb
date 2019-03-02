@@ -40,10 +40,11 @@
 .ENUM $C000
     MusicCounter    DB	    ; counter for current ticks (+1 per vblank)
     MusicTicks	    DB	    ; ticks limit for step
-    MusicPointer    DW      ; pointer to next music data for each channel
-    MusicCounters   DS 3    ; counter for length stuff for each channel
+    MusicPointer    DSW 4   ; pointer to next music data for each channel
+    MusicTimers     DS  4   ; counter for length stuff for each channel
 .ENDE
 
+.DEF MusicChannels  2	    ; total number of music channels
 ;==============================================================================
 ; GAMEBOY HEADER
 ;==============================================================================
@@ -215,29 +216,33 @@ DMACopy:
 
 LoadMusic:
     ; Loads music to play
-    ; de    address to load from
+    ; hl    address to load from
 
     ; load tempo
-    ld a, (de)
+    ldi a, (hl)
+    inc hl
+    inc hl
     ; calculate tempo
-    ; load pointer to music
-    inc de
-    inc de
-    inc de
-    ; store music pointer
-    ld hl, MusicPointer
-    ld a, e
-    ldi (hl), a
-    ld a, d
-    ld (hl), a
-
-    ; temp speed
-    ld a, $10
+    ld a, $10		    ; temp speed
     ld (MusicTicks), a
+
+    ; load pointers to channels
+    ld c, $00
+    ld de, MusicPointer
+-   ldi a, (hl)		    ; lsb
+    ld (de), a
+    inc de
+    ldi a, (hl)		    ; msb
+    ld (de), a
+    inc de
+    inc c
+    ld a, MusicChannels
+    cp c
+    jp nz, -
     ret
 
 UpdateMusic:
-    ; check to see if new note needed
+    ; check to see update is needed (counter will equal ticks)
     ld a, (MusicTicks)
     ld b, a
     ld a, (MusicCounter)
@@ -248,31 +253,30 @@ UpdateMusic:
     xor a			; zero music counter, will do an update
     ld (MusicCounter), a
     
-    ; load first song byte
+    ld c, 0			; start with channel 0
+    ld b, 0
 @readSongData:
-    ld a, (MusicPointer)	; lower byte of music pointer
+    ; load first song byte
+    ld hl, MusicPointer
+    add hl, bc			; channel offset
+    add hl, bc
+    ldi a, (hl)			; lower byte of music pointer
     ld e, a
-    ld a, (MusicPointer+1)	; upper byte of music pointer
+    ld a, (hl)			; upper byte of music pointer
     ld d, a
     ld a, (de)			; get next music byte
-    ld b, a			; will return to a later...
-    ;inc de			; move pointer to next byte
-    ;ld hl, MusicPointer	; store music pointer
-    ;ld a, e
-    ;ldi (hl), a
-    ;ld a, d
-    ;ld (hl), a
 
-    ld a, b
     cp $00			; if the next byte $00...
     ret z			; ...means song is done
     cp $F1			; if the next byte is $F1...
     jp nz, @notloop
 @loopCmd:			; ...loop back by moving the pointer
-    ld hl, MusicPointer	; loading MusicPointer
+    ld hl, MusicPointer		; load MusicPointer
+    add hl, bc			; channel offset
+    add hl, bc
     ldi a, (hl)
     ld e, a
-    ld a, (hl)
+    ldd a, (hl)			; decrement to go back for when storing again
     ld d, a
     inc de
     ld a, (de)			; load loop argument
@@ -280,7 +284,6 @@ UpdateMusic:
 -   dec de
     dec a
     jp nz, -
-    ld hl, MusicPointer	; storing MusicPointer
     ld a, e
     ldi (hl), a
     ld a, d
@@ -297,25 +300,26 @@ UpdateMusic:
     ld a, d
     and $0F
     dec a
-    ld hl, MusicCounters
+    ld hl, MusicTimers
+    add hl, bc			; channel offset
     ld (hl), a			; set the timer
     jp @end
 
 
-@notrest
-    ld a, (MusicCounters)	; is there a counter?
+@notrest:
+    ld hl, MusicTimers
+    add hl, bc
+    ld a, (hl)			; is there a counter?
     cp $00
     jp z, @note
-    dec a
-    ld (MusicCounters), a	; decrement the counter
-    ret				; and skip this music update
+    dec a			; lower counter
+    ld (hl), a
+    jp @nextChannel		; and skip this music update
 
-@note
+@note:
     ld a, d
     ; it's note
-    ;ld d, a
     and $0F			; just note
-    ; now a = note, b = octave
 
     dec a			; entry 0 in LUT is C
     add a			; pitch LUT is 2 bytes/ entry
@@ -323,7 +327,7 @@ UpdateMusic:
     add l
     ld l, a
     ldi a, (hl)			; get pitch value
-    ld c, a
+    ld e, a
     ld a, (hl)
     ld b, a
 
@@ -334,35 +338,65 @@ UpdateMusic:
 -   cp $00
     jp z, +
     sra b
-    rr c
+    rr e
     dec a
     jp -
 
-+   ld a, %10000100		; temporary note
++
+    ; handle note based on channel number
+    ld a, $00
+    cp c
+    jp z, @handleCh0
+    ld a, $01
+    cp c
+    jp z, @handleCh1
+
+@handleCh0:
+    ld a, %10000100		; temporary note
     ldh (R_NR11), a
     ld a, %11110010
     ldh (R_NR12), a
-    ;ld a, %10000000
-    ld a, c
+    ld a, e
     ldh (R_NR13), a
-    ;ld a, %11000000
     ld a, %00000111		; high 3 bit freq mask
     and b
     add %11000000		; high bits to restart sound
     ldh (R_NR14), a
+    jp @end
+
+@handleCh1:
+    ld a, %10000100		; temporary note
+    ldh (R_NR21), a
+    ld a, %11110010
+    ldh (R_NR22), a
+    ld a, e
+    ldh (R_NR23), a
+    ld a, %00000111		; high 3 bit freq mask
+    and b
+    add %11000000		; high bits to restart sound
+    ldh (R_NR24), a
+    jp @end
 
 @end:
-    ld a, (MusicPointer)
+    ld b, 0
+    ld hl, MusicPointer
+    add hl, bc
+    add hl, bc
+    ldi a, (hl)
     ld e, a
-    ld a, (MusicPointer+1)
+    ldd a, (hl)			; decrement hl for later storing music pointer
     ld d, a
     inc de			; increment music pointer
-    ld hl, MusicPointer
     ld a, e			; lower byte
     ldi (hl), a
     ld a, d			; upper byte
     ld (hl), a
 
+@nextChannel:
+    inc c
+    ld a, MusicChannels
+    cp c			; done with all channels?
+    jp nz, @readSongData
     ret
 
 .ENDS
@@ -411,7 +445,7 @@ Start:
 
     ei
 
-    ld de, Music
+    ld hl, Song_MaryLamb
     call LoadMusic
 
     ; setup sound
@@ -463,11 +497,23 @@ Pitches:
 ;	$0 = tempo
 ;	$1 = loop
 Music:
+Song_MaryLamb:
 .DB $F0, $20, $00	; Tempo $0020
+.DW Song_MaryLambCh0
+.DW Song_MaryLambCh1
+;.DW 0, 0, 0
+Song_MaryLambCh0:
 .DB $35, $33, $31, $33, $35, $35, $35, $71
 .DB $33, $33, $33, $71, $35, $38, $38, $71
 .DB $35, $33, $31, $33, $35, $35, $35
 .DB $35, $33, $33, $35, $33, $31, $73
+.DB $F1, $1E 		; loop
+.DB $00			; end
+Song_MaryLambCh1:
+.DB $15, $13, $11, $13, $15, $15, $15, $71
+.DB $13, $13, $13, $71, $15, $18, $18, $71
+.DB $15, $13, $11, $13, $15, $15, $15
+.DB $15, $13, $13, $15, $13, $11, $73
 .DB $F1, $1E 		; loop
 .DB $00			; end
 
