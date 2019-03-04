@@ -44,7 +44,7 @@
     MusicTimers     DS  4   ; counter for length stuff for each channel
 .ENDE
 
-.DEF MusicChannels  2	    ; total number of music channels
+.DEF MusicChannels  3	    ; total number of music channels
 ;==============================================================================
 ; GAMEBOY HEADER
 ;==============================================================================
@@ -214,6 +214,17 @@ DMACopy:
     .DB $F5, $3E, $C1, $EA, $46, $FF, $3E, $28, $3D, $20, $FD, $F1, $D9
     ret
 
+LoadWaveform:
+    ; hl    address to load from
+    ld de, $FF30
+    ld c, 16
+-   ldi a, (hl)
+    ld (de), a
+    inc de
+    dec c
+    jp nz, -
+    ret
+
 LoadMusic:
     ; Loads music to play
     ; hl    address to load from
@@ -267,7 +278,7 @@ UpdateMusic:
     ld a, (de)			; get next music byte
 
     cp $00			; if the next byte $00...
-    ret z			; ...means song is done
+    jp z, @nextChannel		; ...means song is done
     cp $F1			; if the next byte is $F1...
     jp nz, @notloop
 @loopCmd:			; ...loop back by moving the pointer
@@ -350,6 +361,10 @@ UpdateMusic:
     ld a, $01
     cp c
     jp z, @handleCh1
+    ld a, $02
+    cp c
+    jp z, @handleCh2
+    jp @end			; if no handler, ignore it
 
 @handleCh0:
     ld a, %10000100		; temporary note
@@ -365,9 +380,9 @@ UpdateMusic:
     jp @end
 
 @handleCh1:
-    ld a, %10000100		; temporary note
+    ld a, %01010000		; temporary note
     ldh (R_NR21), a
-    ld a, %11110010
+    ld a, %11110110
     ldh (R_NR22), a
     ld a, e
     ldh (R_NR23), a
@@ -375,6 +390,24 @@ UpdateMusic:
     and b
     add %11000000		; high bits to restart sound
     ldh (R_NR24), a
+    jp @end
+
+@handleCh2:
+    ld a, %10000000
+    ldh (R_NR30), a
+    ld a, %00001000
+    ldh (R_NR31), a
+    ld a, %01000000
+    ldh (R_NR32), a
+    ld a, e
+    ldh (R_NR33), a
+    ld a, %00000111
+    and b
+    add %11000000
+    ldh (R_NR34), a
+    jp @end
+
+@handleCh4:
     jp @end
 
 @end:
@@ -435,6 +468,10 @@ Start:
 
     call DMACopy ; set up DMA subroutine
 
+    ; Load waveform
+    ld hl, WaveRamp
+    call LoadWaveform
+
     ; select interrupts to enable
     ld a, %00000001
     ldh (R_IE), a
@@ -488,6 +525,13 @@ Pitches:
 .DW $FBDA   ; B	    c
 
 
+Waveforms:
+WaveSquare:
+.DS 8 $FF
+.DS 8 $00
+WaveRamp:
+.DB $00, $11, $22, $33, $44, $55, $66, $77
+.DB $88, $99, $AA, $BB, $CC, $DD, $EE, $FF
 ; Music format:
 ; $00 = end of song
 ; $XY = note Y in octave X
@@ -501,6 +545,7 @@ Song_MaryLamb:
 .DB $F0, $20, $00	; Tempo $0020
 .DW Song_MaryLambCh0
 .DW Song_MaryLambCh1
+.DW Song_MaryLambCh2
 ;.DW 0, 0, 0
 Song_MaryLambCh0:
 .DB $35, $33, $31, $33, $35, $35, $35, $71
@@ -508,14 +553,10 @@ Song_MaryLambCh0:
 .DB $35, $33, $31, $33, $35, $35, $35
 .DB $35, $33, $33, $35, $33, $31, $73
 .DB $F1, $1E 		; loop
-.DB $00			; end
 Song_MaryLambCh1:
-.DB $15, $13, $11, $13, $15, $15, $15, $71
-.DB $13, $13, $13, $71, $15, $18, $18, $71
-.DB $15, $13, $11, $13, $15, $15, $15
-.DB $15, $13, $13, $15, $13, $11, $73
-.DB $F1, $1E 		; loop
-.DB $00			; end
+Song_MaryLambCh2:
+Song_MaryLambCh3:
+.DB $00
 
 
 .DEFINE TileCount   0
