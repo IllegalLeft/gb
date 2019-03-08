@@ -44,7 +44,7 @@
     MusicTimers     DS  4   ; counter for length stuff for each channel
 .ENDE
 
-.DEF MusicChannels  3	    ; total number of music channels
+.DEF MusicChannels  4	    ; total number of music channels
 ;==============================================================================
 ; GAMEBOY HEADER
 ;==============================================================================
@@ -328,6 +328,10 @@ UpdateMusic:
     jp @nextChannel		; and skip this music update
 
 @note:
+    ld a, $03			; will skip freq if noise channel
+    cp c
+    jr z, @handleCh3
+
     ld a, d
     ; it's note
     and $0F			; just note
@@ -377,7 +381,7 @@ UpdateMusic:
     and b
     add %11000000		; high bits to restart sound
     ldh (R_NR14), a
-    jp @end
+    jr @end
 
 @handleCh1:
     ld a, %01010000		; temporary note
@@ -390,7 +394,7 @@ UpdateMusic:
     and b
     add %11000000		; high bits to restart sound
     ldh (R_NR24), a
-    jp @end
+    jr @end
 
 @handleCh2:
     ld a, %10000000
@@ -405,10 +409,27 @@ UpdateMusic:
     and b
     add %11000000
     ldh (R_NR34), a
-    jp @end
+    jr @end
 
-@handleCh4:
-    jp @end
+@handleCh3:
+    ld hl, NoiseSamples
+    ld e, d
+    ld d, 0
+    dec e 
+    srl d
+    rl e
+    add hl, de
+    ldi a, (hl)
+    ldh (R_NR42), a
+    ld a, (hl)
+    ldh (R_NR43), a
+    ;ld a, %10000100
+    ;ldh (R_NR42), a
+    ;ld a, %01000100
+    ;ldh (R_NR43), a
+    ld a, %11000000
+    ldh (R_NR44), a
+    ;jr @end
 
 @end:
     ld b, 0
@@ -510,6 +531,13 @@ MainLoop:
 .BANK 0
 .SECTION "Data" FREE
 
+.DEFINE TileCount   0
+Tiles:
+.DB $00
+
+.ENDS
+
+.SECTION "MusicData" FREE
 Pitches:
 .DW $F82C   ; C	    1
 .DW $F89D   ; C#    2
@@ -524,28 +552,39 @@ Pitches:
 .DW $FB9B   ; A#    b
 .DW $FBDA   ; B	    c
 
-
-Waveforms:
 WaveSquare:
 .DS 8 $FF
 .DS 8 $00
 WaveRamp:
 .DB $00, $11, $22, $33, $44, $55, $66, $77
 .DB $88, $99, $AA, $BB, $CC, $DD, $EE, $FF
+
+NoiseSamples:
+Kick:		; 1
+.DB $81, $56
+Snare:		; 2
+.DB $82, $51
+HiHat2:		; 3
+.DB $81, $00
+HiHat2Open:	; 4
+.DB $82, $00
+HiHat:		; 5
+.DB $42, $14
+
 ; Music format:
 ; $00 = end of song
-; $XY = note Y in octave X
+; $YX = note Y in octave X
 ;	notes $1-C, octaves $0-$6
 ; $7X = pause for X counts
 ; $FX = commands followed by operand bytes
 ;	$0 = tempo
 ;	$1 = loop
-Music:
 Song_MaryLamb:
 .DB $F0, $20, $00	; Tempo $0020
 .DW Song_MaryLambCh0
 .DW Song_MaryLambCh1
 .DW Song_MaryLambCh2
+.DW Song_MaryLambCh3
 ;.DW 0, 0, 0
 Song_MaryLambCh0:
 .DB $35, $33, $31, $33, $35, $35, $35, $71
@@ -555,12 +594,11 @@ Song_MaryLambCh0:
 .DB $F1, $1E 		; loop
 Song_MaryLambCh1:
 Song_MaryLambCh2:
-Song_MaryLambCh3:
 .DB $00
-
-
-.DEFINE TileCount   0
-Tiles:
+Song_MaryLambCh3:
+.DB $01, $03
+.DB $02, $03
+.DB $F1, $04
 .DB $00
 
 .ENDS
