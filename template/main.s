@@ -9,6 +9,8 @@
 ;
 ;==============================================================================
 
+.INCLUDE "gb_hardware.i"
+
 .GBHEADER
     NAME "TITLE"
     CARTRIDGETYPE $00 ; RAM only
@@ -94,8 +96,7 @@ CopyData:
 ; SUBROUTINES
 ;==============================================================================
 .BANK 0
-.ORGA $3000
-
+.SECTION "Subroutines" FREE
 ; Init Subroutines
 BlankSprites:
     ld hl, $8000
@@ -179,20 +180,17 @@ LoadMap:
     ret
 
 ScreenOn:
-    ldh a, ($40)
+    ldh a, (R_LCDC)
     or %01000000
-    ldh ($40), a
+    ldh (R_LCDC), a
     ret
 
 ScreenOff:
     ld a, 0
-    ldh ($40), a
+    ldh (R_LCDC), a
     ret
 
 WaitVBlank:
-    ld a, ($FF44)
-    cp $91
-    jr nz, WaitVBlank
     ret
 
 DMACopy:
@@ -204,6 +202,7 @@ DMACopy:
     .DB $F5, $3E, $C1, $EA, $46, $FF, $3E, $28, $3D, $20, $FD, $F1, $D9
     ret
 
+.ENDS
 
 ;==============================================================================
 ; START
@@ -214,13 +213,15 @@ Start:
     ld sp, $FFFE    ; setup stack
 
     ; wait for vblank
-    call WaitVBlank
+-   ld a, (LY)
+    cp $91
+    jr nz, -
     ; turn screen off
     call ScreenOff
 
     ; no sound needed
     xor a
-    ldh ($26), a
+    ldh (R_NR52), a
 
     call BlankWRAM
     call BlankOAM
@@ -232,19 +233,23 @@ Start:
 
     ; load palette
     ld a, %11100100	; bg
-    ldh ($47), a
+    ldh (R_BGP), a
     ld a, %00011011	; obj
-    ldh ($48), a
+    ldh (R_OBP0), a
 
     call DMACopy ; set up DMA subroutine
 
     ; setup screen
     ld a, %10010011
-    ldh ($40), a
+    ldh (R_LCDC), a
+
+    ld a, $01 
+    ldh (R_IE), a
     ei
 
 MainLoop:
-    call WaitVBlank
+    halt
+    nop
     call $FF80 ; DMA routine in HRAM
 
     jp MainLoop
