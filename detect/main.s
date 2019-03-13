@@ -127,6 +127,13 @@ CopyData:
 .BANK 0
 .SECTION "Subroutines" FREE
 
+PAL_SET:
+    .DB ($0A << 3) + 1
+    .DB 0, 1, 2, 3, 4, 5, 6, 7
+    .DS 7, $00
+PAL_TRN:
+    .DB ($0B << 3) + 1
+    .DS 15, $00
 MLT_REQ1P:
     .DB ($11 << 3) + 1
     .DS 15, $00
@@ -138,11 +145,21 @@ MLT_REQ4P:
     .DB ($11 << 3) + 1
     .DB $03
     .DS 14, $00
+PAL01:
+    .DB ($00 << 3) + 1
+    .DW $24A6, $4609, $2B72, $77DC
+    .DW $4609, $2B72, $77DC
+    .DB $00
 
 SGBSend:
     ; hl    SGB data to send (16 bytes long)
+    ld a, (hl)
+    and $07		; only packet count
+    ret z		; no need to send if no packets to send
+    ld d, a
+
     ; RESET pulse
-    xor a
+--- xor a
     ldh (R_P1), a
     ld a, $30
     ldh (R_P1), a
@@ -171,6 +188,21 @@ SGBSend:
     ldh (R_P1), a
     ld a, $30
     ldh (R_P1), a
+
+    dec d
+    ; pause 60ms
+    ld bc, 7000
+-   nop
+    nop
+    nop
+    dec bc
+    ld a, b
+    or c
+    jr nz, -
+    ; next packet?
+    xor a
+    cp d
+    jr nz, ---
     ret
 
 DetectSystem:
@@ -408,6 +440,9 @@ Start:
     ldh (R_OBP0), a
 
     ; CGB Palette
+    ldh a, ($8D)
+    cp $02
+    jr nz, +
     ld a, $80
     ldh (R_BCPS), a
     ld hl, PaletteDMG
@@ -416,6 +451,18 @@ Start:
     ldh (R_BCPD), a
     dec c
     jr nz, -
++
+
+    ; SGB Palette
+    ldh a, ($8D)
+    cp $03
+    jr z, +
+    cp $04
+    jr z, +
+    jr ++
++   ld hl, PAL01
+    call SGBSend
+++
 
     call DMACopy ; set up DMA subroutine
 
