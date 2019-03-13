@@ -42,6 +42,8 @@
     MusicTicks	    DB	    ; ticks limit for step
     MusicPointer    DSW 4   ; pointer to next music data for each channel
     MusicTimers     DS  4   ; counter for length stuff for each channel
+    MusicLen	    DS	4   ; length byte for each channel
+    MusicEnv	    DS  4   ; envelope byte for each channel
 .ENDE
 
 .DEF MusicChannels  4	    ; total number of music channels
@@ -231,10 +233,7 @@ LoadMusic:
 
     ; load tempo
     ldi a, (hl)
-    inc hl
-    inc hl
     ; calculate tempo
-    ld a, $10		    ; temp speed
     ld (MusicTicks), a
 
     ; load pointers to channels
@@ -277,10 +276,33 @@ UpdateMusic:
     ld d, a
     ld a, (de)			; get next music byte
 
+    ; Check for various commands and special cases
     cp $00			; if the next byte $00...
-    jp z, @nextChannel		; ...means song is done
-    cp $F1			; if the next byte is $F1...
-    jp nz, @notloop
+    jp z, @nextChannel		; ...means score is done
+    cp $F0
+    jr z, @tempoCmd
+    cp $F1
+    jr z, @loopCmd
+    jr @notCmd
+
+@tempoCmd:
+    ld hl, MusicPointer		; load MusicPointer
+    add hl, bc			; x2 since 2 bytes long
+    add hl, bc
+    ldi a, (hl)
+    ld e, a
+    ldd a, (hl)			; decrement to go back for when storing again
+    ld d, a
+    inc de
+    ld a, (de)
+    inc de
+    ld (MusicTicks), a		; set new frame ticks limit/tempo
+    ld a, e
+    ldi (hl), a
+    ld a, d
+    ld (hl), a
+    jp @readSongData
+
 @loopCmd:			; ...loop back by moving the pointer
     ld hl, MusicPointer		; load MusicPointer
     add hl, bc			; channel offset
@@ -301,7 +323,7 @@ UpdateMusic:
     ld (hl), a
     jp @readSongData
 
-@notloop:
+@notCmd:
     ld d, a
     and $F0
     cp $70
@@ -423,10 +445,6 @@ UpdateMusic:
     ldh (R_NR42), a
     ld a, (hl)
     ldh (R_NR43), a
-    ;ld a, %10000100
-    ;ldh (R_NR42), a
-    ;ld a, %01000100
-    ;ldh (R_NR43), a
     ld a, %11000000
     ldh (R_NR44), a
     ;jr @end
@@ -503,7 +521,7 @@ Start:
 
     ei
 
-    ld hl, Song_MaryLamb
+    ld hl, Song_CmdTests
     call LoadMusic
 
     ; setup sound
@@ -580,26 +598,63 @@ HiHat:		; 5
 ;	$0 = tempo
 ;	$1 = loop
 Song_MaryLamb:
-.DB $F0, $20, $00	; Tempo $0020
-.DW Song_MaryLambCh0
-.DW Song_MaryLambCh1
-.DW Song_MaryLambCh2
-.DW Song_MaryLambCh3
-;.DW 0, 0, 0
+    .DB $10,	; Tempo $20
+    .DW Song_MaryLambCh0
+    .DW Song_MaryLambCh1
+    .DW Song_MaryLambCh2
+    .DW Song_MaryLambCh3
 Song_MaryLambCh0:
-.DB $35, $33, $31, $33, $35, $35, $35, $71
-.DB $33, $33, $33, $71, $35, $38, $38, $71
-.DB $35, $33, $31, $33, $35, $35, $35
-.DB $35, $33, $33, $35, $33, $31, $73
-.DB $F1, $1E 		; loop
+    .DB $35, $33, $31, $33, $35, $35, $35, $71
+    .DB $33, $33, $33, $71, $35, $38, $38, $71
+    .DB $35, $33, $31, $33, $35, $35, $35
+    .DB $35, $33, $33, $35, $33, $31, $73
+    .DB $F1, $1E 		; loop
 Song_MaryLambCh1:
 Song_MaryLambCh2:
-.DB $00
+    .DB $00
 Song_MaryLambCh3:
-.DB $01, $03
-.DB $02, $03
-.DB $F1, $04
-.DB $00
+    .DB $01, $03
+    .DB $02, $03
+    .DB $F1, $04
+    .DB $00
+
+Song_WavTest:
+    .DB $08
+    .DW Song_WavTestCh0
+    .DW Song_WavTestCh1
+    .DW Song_WavTestCh2
+    .DW Song_WavTestCh3
+Song_WavTestCh0:
+Song_WavTestCh1:
+    .DB $00
+Song_WavTestCh2:
+    .DB $35, $33, $31, $33, $35, $35, $35, $71
+    .DB $33, $33, $33, $71, $35, $38, $38, $71
+    .DB $35, $33, $31, $33, $35, $35, $35
+    .DB $35, $33, $33, $35, $33, $31, $73
+    .DB $F1, $1E 		; loop
+Song_WavTestCh3:
+    .DB $01, $03
+    .DB $02, $03
+    .DB $F1, $04
+    .DB $00
+
+Song_CmdTests:
+    .DB $10
+    .DW Song_CmdTestsCh0
+    .DW Song_CmdTestsCh1
+    .DW Song_CmdTestsCh2
+    .DW Song_CmdTestsCh3
+Song_CmdTestsCh0:
+    .DB $31, $35, $38, $35
+    .DB $F0, $0A
+    .DB $31, $35, $38, $35
+    .DB $F0, $10
+    .DB $F1, 12
+Song_CmdTestsCh1:
+Song_CmdTestsCh2:
+Song_CmdTestsCh3:
+    .DB $00
 
 .ENDS
 
