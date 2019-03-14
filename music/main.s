@@ -42,8 +42,7 @@
     MusicTicks	    DB	    ; ticks limit for step
     MusicPointer    DSW 4   ; pointer to next music data for each channel
     MusicTimers     DS  4   ; counter for length stuff for each channel
-    MusicLen	    DS	4   ; length byte for each channel
-    MusicEnv	    DS  4   ; envelope byte for each channel
+    MusicVoices	    DSW 3   ; music voice/instruments
 .ENDE
 
 .DEF MusicChannels  4	    ; total number of music channels
@@ -233,8 +232,27 @@ LoadMusic:
 
     ; load tempo
     ldi a, (hl)
-    ; calculate tempo
     ld (MusicTicks), a
+
+    ; load instruments/voices
+    ; voice 1
+    ld de, MusicVoices
+.REPEAT 3
+    ld bc, Instruments
+    ldi a, (hl)
+    add a		    ; 2 bytes for instruments/voices
+    add c
+    ld c, a
+    jr nc, +
+    inc b		    ; carry just in case
++   ld a, (bc)
+    ld (de), a
+    inc bc
+    inc de
+    ld a, (bc)
+    ld (de), a
+    inc de
+.ENDR
 
     ; load pointers to channels
     ld c, $00
@@ -283,6 +301,8 @@ UpdateMusic:
     jr z, @tempoCmd
     cp $F1
     jr z, @loopCmd
+    cp $F2
+    jr z, @ChVoiceCmd
     jr @notCmd
 
 @tempoCmd:
@@ -321,6 +341,47 @@ UpdateMusic:
     ldi (hl), a
     ld a, d
     ld (hl), a
+    jp @readSongData
+
+@ChVoiceCmd:			; edit the channel's MusicVoice data
+    ; load music pointer and increment it
+    ld hl, MusicPointer
+    add hl, bc			; x2 since 2byte len for pointer
+    add hl, bc
+    ldi a, (hl)
+    ld e, a
+    ldd a, (hl)
+    ld d, a
+    inc de
+    ld a, (de)			; load argument
+    push de			; store MusicPointer value for later
+    ld e, a
+    xor a
+    ld d, a
+    ; add argument to Instruments to get instrument
+    ld hl, Instruments
+    add hl, de
+    ; add channel offset (c) to MusicVoices to get destination
+    ld de, MusicVoices
+    ld a, c
+    add e
+    jr nc, +			; handle carry to d
+    inc d
++   ld e, a
+    ldi a, (hl)			; move instrument to destination (2 bytes)
+    ld (de), a
+    inc de
+    ld a, (hl)
+    ld (de), a
+    pop de			; retrieve MusicPointer value
+    ld hl, MusicPointer
+    add hl, bc
+    add hl, bc
+    inc de			; advance it
+    ld a, e
+    ldi (hl), a
+    ld a, d
+    ld (hl), a			; store it back
     jp @readSongData
 
 @notCmd:
@@ -393,9 +454,9 @@ UpdateMusic:
     jp @end			; if no handler, ignore it
 
 @handleCh0:
-    ld a, %10000100		; temporary note
+    ld a, (MusicVoices + 0)
     ldh (R_NR11), a
-    ld a, %11110010
+    ld a, (MusicVoices + 1)
     ldh (R_NR12), a
     ld a, e
     ldh (R_NR13), a
@@ -406,9 +467,9 @@ UpdateMusic:
     jr @end
 
 @handleCh1:
-    ld a, %01010000		; temporary note
+    ld a, (MusicVoices + 2)
     ldh (R_NR21), a
-    ld a, %11110110
+    ld a, (MusicVoices + 3)
     ldh (R_NR22), a
     ld a, e
     ldh (R_NR23), a
@@ -421,9 +482,9 @@ UpdateMusic:
 @handleCh2:
     ld a, %10000000
     ldh (R_NR30), a
-    ld a, %00001000
+    ld a, (MusicVoices + 4)
     ldh (R_NR31), a
-    ld a, %01000000
+    ld a, (MusicVoices + 5)
     ldh (R_NR32), a
     ld a, e
     ldh (R_NR33), a
@@ -447,7 +508,6 @@ UpdateMusic:
     ldh (R_NR43), a
     ld a, %11000000
     ldh (R_NR44), a
-    ;jr @end
 
 @end:
     ld b, 0
@@ -570,6 +630,14 @@ Pitches:
 .DW $FB9B   ; A#    b
 .DW $FBDA   ; B	    c
 
+Instruments:
+Inst1:
+    .DB $84, $F2
+Inst2:
+    .DB $07, $40
+Inst3:
+    .DB $27, $F2
+
 WaveSquare:
 .DS 8 $FF
 .DS 8 $00
@@ -597,8 +665,10 @@ HiHat:		; 5
 ; $FX = commands followed by operand bytes
 ;	$0 = tempo
 ;	$1 = loop
+;	$2 = change instrument/voice
 Song_MaryLamb:
     .DB $10,	; Tempo $20
+    .DB $00, $00, $01
     .DW Song_MaryLambCh0
     .DW Song_MaryLambCh1
     .DW Song_MaryLambCh2
@@ -620,6 +690,7 @@ Song_MaryLambCh3:
 
 Song_WavTest:
     .DB $08
+    .DB $00, $00, $01
     .DW Song_WavTestCh0
     .DW Song_WavTestCh1
     .DW Song_WavTestCh2
@@ -641,6 +712,7 @@ Song_WavTestCh3:
 
 Song_CmdTests:
     .DB $10
+    .DB $00, $00, $01
     .DW Song_CmdTestsCh0
     .DW Song_CmdTestsCh1
     .DW Song_CmdTestsCh2
@@ -648,9 +720,11 @@ Song_CmdTests:
 Song_CmdTestsCh0:
     .DB $31, $35, $38, $35
     .DB $F0, $0A
+    .DB $F2, $03
     .DB $31, $35, $38, $35
     .DB $F0, $10
-    .DB $F1, 12
+    .DB $F2, $00
+    .DB $F1, 16
 Song_CmdTestsCh1:
 Song_CmdTestsCh2:
 Song_CmdTestsCh3:
