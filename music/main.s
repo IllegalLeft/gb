@@ -73,19 +73,6 @@ CopyData:
     jp Start
 
 ;==============================================================================
-; WRAM DEFINITIONS
-;==============================================================================
-
-.ENUM $C000
-    MusicCounter    DB	    ; counter for current ticks (+1 per vblank)
-    MusicTicks	    DB	    ; ticks limit for step
-    MusicPointer    DSW 4   ; pointer to next music data for each channel
-    MusicTimers     DS  4   ; counter for length stuff for each channel
-    MusicVoices	    DSW 3   ; music voice/instruments
-.ENDE
-
-.DEF MusicChannels  4	    ; total number of music channels
-;==============================================================================
 ; SUBROUTINES
 ;==============================================================================
 .BANK 0
@@ -280,27 +267,14 @@ Tiles:
 .ENDS
 
 .SECTION "MusicData" FREE
-Pitches:
-.DW $F82C   ; C	    1
-.DW $F89D   ; C#    2
-.DW $F907   ; D	    3
-.DW $F96B   ; D#    4
-.DW $F9CA   ; E	    5
-.DW $FA23   ; F	    6
-.DW $FA77   ; F#    7
-.DW $FAC7   ; G	    8
-.DW $FB12   ; G#    9
-.DW $FB58   ; A	    a
-.DW $FB9B   ; A#    b
-.DW $FBDA   ; B	    c
 
 Instruments:
 Inst1:
-    .DB $84, $F2
+.DB $84, $F2
 Inst2:
-    .DB $07, $40
+.DB $07, $40
 Inst3:
-    .DB $27, $F2
+.DB $27, $F2
 
 WaveSquare:
 .DS 8 $FF

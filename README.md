@@ -15,6 +15,11 @@ Scrolling background demo.
 
 ![bg screenshot](bg/screenshot.bmp)
 
+### Detect
+Detects the system that the rom is connected to.
+
+![detect screenshot](detect/screenshot.bmp)
+
 ### Run
 Whippet runs along a beach!
 
