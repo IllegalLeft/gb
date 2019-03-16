@@ -1,5 +1,6 @@
 [objects]
 main.o
 music.o
+songs.o
 
 [libraries]
