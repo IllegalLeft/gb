@@ -1,5 +1,7 @@
 [objects]
 main.o
 interrupts.o
+graphics.o
+strings.o
 
 [libraries]

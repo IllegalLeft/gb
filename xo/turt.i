@@ -17,9 +17,11 @@
 .DEFINE turt_tile_map_size  $0168
 .DEFINE turt_tile_map_width  $14
 .DEFINE turt_tile_map_height  $12
+.EXPORT turt_tile_map_size, turt_tile_map_width, turt_tile_map_height
 
 .DEFINE turt_tile_data_size  $07D0
 .DEFINE turt_tile_count  $7D
+.EXPORT turt_tile_data_size, turt_tile_count
 
 ; ////////////////
 ; //            //

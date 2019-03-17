@@ -39,12 +39,6 @@
 .DEFINE numberOffset	$80
 .DEFINE alphaOffset	numberOffset+11
 
-.ASCIITABLE
-MAP "0" TO "9" = numberOffset
-MAP "A" TO "Z" = alphaOffset
-MAP " " = $8A
-MAP "@" = $00
-.ENDA
 
 ;==============================================================================
 ; SUBROUTINES
@@ -977,17 +971,8 @@ Credits:
 ;==============================================================================
 ; DATA
 ;==============================================================================
-.SECTION "Data" FREE
-Tiles:
-.INCBIN "numbers.bin"	FSIZE size_of_numbers
-.INCBIN "alphas.bin"	FSIZE size_of_alphas
+.SECTION "MiscData" FREE
 
-.INCLUDE "turt.s"
-.INCLUDE "shell.s"
-.INCLUDE "ox.i"
-.INCLUDE "cursor.i"
-
-.DEFINE TileCount	size_of_numbers + size_of_alphas
 
 FieldAddr:
 .DW $98A6, $98A9, $98AC, $9906, $9909, $990C, $9966, $9969, $996C
@@ -995,26 +980,6 @@ FieldAddr:
 CursorPos:  ; yyxx
 .DW $3844, $385C, $3874, $5044, $505C, $5074, $6844, $685C, $6874
 
-; Strings
-TextTitle:
-.ASC "TURTLE TIC TAC TOE@"
-TextStart:
-.ASC "PRESS  START@"
-TextWin:
-.ASC "YOU WIN@"
-TextLose:
-.ASC "YOU LOSE@"
-TextTie:
-.ASC "YOU TIE@"
-
-Credits1a:
-.ASC "CODE AND ART@"
-Credits1b:
-.ASC "SAM@"
-Credits2a:
-.ASC "CONCEPT ART@"
-Credits2b:
-.ASC "HEIDI@"
 .ENDS
 
 ; vim: filetype=wla

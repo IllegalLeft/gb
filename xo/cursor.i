@@ -17,9 +17,11 @@
 .DEFINE cursor_tile_map_size  $04
 .DEFINE cursor_tile_map_width  $02
 .DEFINE cursor_tile_map_height  $02
+.EXPORT cursor_tile_map_size, cursor_tile_map_width, cursor_tile_map_height
 
 .DEFINE cursor_tile_data_size  $40
 .DEFINE cursor_tile_count  $04
+.EXPORT cursor_tile_data_size, cursor_tile_count
 
 ; ////////////////
 ; //            //
