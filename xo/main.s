@@ -9,26 +9,8 @@
 ;
 ;==============================================================================
 
-.GBHEADER
-    NAME "XOXOXO"
-    CARTRIDGETYPE $00 ; RAM only
-    RAMSIZE $00 ; 32KByte, no ROM banking
-    COUNTRYCODE $01 ; outside Japan
-    NINTENDOLOGO
-    LICENSEECODENEW "SV"
-    ROMDMG  ; DMG rom
-.ENDGB
-
-
-.MEMORYMAP
-    DEFAULTSLOT 0
-    SLOTSIZE $4000
-    SLOT 0 $0000
-    SLOT 1 $4000
-.ENDME
-
-.ROMBANKSIZE $4000
-.ROMBANKS 2
+.INCLUDE "gb_hardware.i"
+.INCLUDE "header.i"
 
 ; WRAM Variables
 .ENUM $C000
@@ -63,65 +45,6 @@ MAP "A" TO "Z" = alphaOffset
 MAP " " = $8A
 MAP "@" = $00
 .ENDA
-
-;==============================================================================
-; GAMEBOY HEADER
-;==============================================================================
-.BANK 0
-.ORG $00    ; Reset $00
-    jp $100
-.ORG $08    ; Reset $08
-    jp $100
-.ORG $10    ; Reset $10
-    jp $100
-.ORG $18    ; Reset $18
-    jp $100
-.ORG $20    ; Reset $20
-    jp $100
-.ORG $28    ; Reset $28	- Copy Data routine
-CopyData:
-    pop hl  ; pop return address off stack
-    push bc
-
-    ; get number of bytes to copy
-    ; hl contains the address of the bytes following the rst call
-    ldi a, (hl)
-    ld b, a
-    ldi a, (hl)
-    ld c, a
-
--   ldi a, (hl)	; start transfering data
-    ld (de), a
-    inc de
-    dec bc
-    ld a, b
-    or c
-    jr nz, -
-
-    ; all done
-    pop bc
-    jp hl
-    reti
-
-.ORG $30    ; Reset $30
-    ;jp $100	; is overwritten above
-.ORG $38    ; Reset $38
-    ;jp $100	; is overwritten above
-.ORG $40    ; Vblank IRQ Vector
-    reti
-.ORG $48    ; LCD IRQ Vector
-    reti
-.ORG $50    ; Timer IRQ Vector
-    reti
-.ORG $58    ; Serial IRQ Vector
-    reti
-.ORG $60    ; Joypad IRQ Vector
-    reti
-
-.ORG $100   ; Code Execution Start
-    nop
-    jp Start
-
 
 ;==============================================================================
 ; SUBROUTINES
@@ -1056,17 +979,15 @@ Credits:
 ;==============================================================================
 .SECTION "Data" FREE
 Tiles:
-.INCBIN "numbers.bin" FSIZE size_of_numbers
-.INCBIN "alphas.bin" FSIZE size_of_alphas
+.INCBIN "numbers.bin"	FSIZE size_of_numbers
+.INCBIN "alphas.bin"	FSIZE size_of_alphas
 
 .INCLUDE "turt.s"
 .INCLUDE "shell.s"
 .INCLUDE "ox.i"
 .INCLUDE "cursor.i"
 
-.DEFINE TileCount   size_of_numbers + size_of_alphas
-
-.INCBIN "boot.bin"  FSIZE size_of_boot
+.DEFINE TileCount	size_of_numbers + size_of_alphas
 
 FieldAddr:
 .DW $98A6, $98A9, $98AC, $9906, $9909, $990C, $9966, $9969, $996C
