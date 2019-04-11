@@ -13,17 +13,17 @@
 .INCLUDE "header.i"
 
 ; WRAM Variables
-.ENUM $C000
-    state	DB		; 0 main menu, 1 xturn, 2 oturn, 3 end game
-    initiator	DB		; holds player who started last
-    won		DB
-    lost	DB
-    tied	DB
-    cursorx	DB		; 0-2
-    cursory	DB		; 0-2
-    field	DS	9	; field is 3x3, 0 empty, 1 x, 2 o
-    seed	DB		; seed for randint generator
-.ENDE
+.RAMSECTION "Variables" SLOT 2	; Internal WRAM
+    state:	DB		; 0 main menu, 1 xturn, 2 oturn, 3 end game
+    initiator:	DB		; holds player who started last
+    won:	DB
+    lost:	DB
+    tied:	DB
+    cursorx:	DB		; 0-2
+    cursory:	DB		; 0-2
+    field:	DS	9	; field is 3x3, 0 empty, 1 x, 2 o
+    seed:	DB		; seed for randint generator
+.ENDS
 ; $C100 is OAM buffer
 .ENUM $C200
     tilemapbuff	DS	20*18	; tilemap buffer
@@ -35,9 +35,6 @@
     joypadStateOld	DB
     joypadStateDiff	DB
 .ENDE
-
-.DEFINE numberOffset	$80
-.DEFINE alphaOffset	numberOffset+11
 
 
 ;==============================================================================
@@ -680,10 +677,6 @@ Start:
     ; turn screen off
     call ScreenOff
 
-    ; no sound needed
-    xor a
-    ldh ($26), a
-
     ; Blank a buncha stuff
     call BlankWRAM
     call BlankOAM
@@ -758,6 +751,20 @@ SoftReset:
     call BlankOAM
 
     call UpdateScreen
+
+    ; setup sound
+    ld a, $80
+    ldh (R_NR52), a
+    ld a, $77
+    ldh (R_NR50), a
+    ld a, %11111111
+    ldh (R_NR51), a
+
+    ld hl, WaveRamp
+    call LoadWaveform
+    ld hl, SongTitle
+    call LoadMusic
+
     call ScreenOn
 
     call FadeIn
@@ -768,6 +775,9 @@ TitleScreen:
     nop
 
     call $FF80	    ; DMA routine in HRAM
+
+    call UpdateMusic
+
     call ReadInput
     ld a, (joypadStateNew)
     cp %00000101
@@ -780,6 +790,12 @@ TitleScreen:
 GameSetup:
     call FadeOut
     call ScreenOff
+
+    ; turn off sound
+    xor a
+    ldh (R_NR52), a
+
+
     call BlankMap
     call BlankSprites
 

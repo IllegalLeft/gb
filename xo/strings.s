@@ -6,6 +6,7 @@
 
 .DEFINE numberOffset	$80
 .DEFINE alphaOffset	numberOffset+11
+.EXPORT numberOffset, alphaOffset
 
 .ASCIITABLE
     MAP "0" TO "9" = numberOffset
@@ -29,7 +30,7 @@ TextTie:
 .ASC "YOU TIE@"
 
 Credits1a:
-.ASC "CODE AND ART@"
+.ASC "CODE  ART  MUSIC@"
 Credits1b:
 .ASC "SAM@"
 Credits2a:

@@ -3,5 +3,7 @@ main.o
 interrupts.o
 graphics.o
 strings.o
+music.o
+songs.o
 
 [libraries]
