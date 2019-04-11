@@ -82,6 +82,14 @@ LoadMusic:
     ld a, MusicChannels
     cp c
     jp nz, -
+
+    ; zero timers
+    xor a
+    ld hl, MusicTimers
+    ldi (hl), a
+    ldi (hl), a
+    ldi (hl), a
+    ldi (hl), a
     ret
 
 UpdateMusic:
