@@ -60,6 +60,28 @@ Song_MaryLambCh3:
     .DB $F1, $04
     .DB $00
 
+Song_PauseTest:
+    .DB $20
+    .DB $0, 0, 1
+    .DW PauseCh0, PauseCh1, PauseCh2, PauseCh3
+PauseCh0:
+    .DB $31, $33, $35, $33
+    .DB $31, $33, $35, $33
+    .DB $31, $33, $35, $33
+    .DB $31, $33, $35, $33
+    .DB $F1, 16
+    .DB $00
+PauseCh1:
+    .DB $18, $73
+    .DB $38, $71, $71, $71
+    .DB $38, $71, $72
+    .DB $28, $72, $71
+    .DB $F1, 12
+    .DB $00
+PauseCh2:
+PauseCh3:
+    .DB 0
+
 Song_WavTest:
     .DB $08
     .DB $00, $00, $01

@@ -232,7 +232,7 @@ Start:
 
     ei
 
-    ld hl, Song_CmdTests
+    ld hl, Song_PauseTest
     call LoadMusic
 
     ; setup sound
@@ -240,7 +240,7 @@ Start:
     ldh (R_NR52), a
     ld a, %01110111 ; full volume
     ldh (R_NR50), a
-    ld a, $FF	    ; mono
+    ld a, %11011110
     ldh (R_NR51), a
 
 MainLoop:

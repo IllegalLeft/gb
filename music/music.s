@@ -14,13 +14,13 @@
 ; WRAM DEFINITIONS
 ;==============================================================================
 
-.ENUM $C000
-    MusicCounter    DB	    ; counter for current ticks (+1 per vblank)
-    MusicTicks	    DB	    ; ticks limit for step
-    MusicPointer    DSW 4   ; pointer to next music data for each channel
-    MusicTimers     DS  4   ; counter for length stuff for each channel
-    MusicVoices	    DSW 3   ; music voice/instruments
-.ENDE
+.RAMSECTION "MusicVars" SLOT 2 ; Internal WRAM
+    MusicTicks:		db
+    MusicTickLimit:	db
+    MusicPointer:	dsw 4
+    MusicTimers:	ds  4
+    MusicVoices:	dsw 3
+.ENDS
 
 .DEF MusicChannels  4	    ; total number of music channels
 
@@ -47,7 +47,7 @@ LoadMusic:
 
     ; load tempo
     ldi a, (hl)
-    ld (MusicTicks), a
+    ld (MusicTickLimit), a
 
     ; load instruments/voices
     ; voice 1
@@ -86,15 +86,15 @@ LoadMusic:
 
 UpdateMusic:
     ; check to see update is needed (counter will equal ticks)
-    ld a, (MusicTicks)
+    ld a, (MusicTickLimit)
     ld b, a
-    ld a, (MusicCounter)
+    ld a, (MusicTicks)
     inc a
     cp b
-    ld (MusicCounter), a
+    ld (MusicTicks), a
     ret nz			; no update needed
     xor a			; zero music counter, will do an update
-    ld (MusicCounter), a
+    ld (MusicTicks), a
     
     ld c, 0			; start with channel 0
     ld b, 0
@@ -118,7 +118,7 @@ UpdateMusic:
     jr z, @loopCmd
     cp $F2
     jr z, @ChVoiceCmd
-    jr @notCmd
+    jr @checkRest
 
 @tempoCmd:
     ld hl, MusicPointer		; load MusicPointer
@@ -131,7 +131,7 @@ UpdateMusic:
     inc de
     ld a, (de)
     inc de
-    ld (MusicTicks), a		; set new frame ticks limit/tempo
+    ld (MusicTickLimit), a		; set new frame ticks limit/tempo
     ld a, e
     ldi (hl), a
     ld a, d
@@ -199,23 +199,27 @@ UpdateMusic:
     ld (hl), a			; store it back
     jp @readSongData
 
-@notCmd:
+@checkRest:
     ld d, a
     and $F0
     cp $70
-    jp nz, @notrest
+    jp nz, @checkTimer
 
     ; it's a rest
     ld a, d
     and $0F
     dec a
+    ld d, a
+
     ld hl, MusicTimers
     add hl, bc			; channel offset
+    ld a, (hl)			; pull current timer
+    add d
     ld (hl), a			; set the timer
     jp @end
 
 
-@notrest:
+@checkTimer:
     ld hl, MusicTimers
     add hl, bc
     ld a, (hl)			; is there a counter?
