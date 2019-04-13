@@ -5,12 +5,14 @@
 
 .GBHEADER
     NAME "XOXOXO"
-    CARTRIDGETYPE $00 ; RAM only
-    RAMSIZE $00 ; 32KByte, no ROM banking
-    COUNTRYCODE $01 ; outside Japan
+    CARTRIDGETYPE $00	; RAM only
+    RAMSIZE $00		; 32KByte, no ROM banking
+    COUNTRYCODE $01	; outside Japan
     NINTENDOLOGO
     LICENSEECODENEW "SV"
-    ROMDMG  ; DMG rom
+    LICENSEECODEOLD $33
+    ROMGBC
+    ROMSGB
 .ENDGB
 
 

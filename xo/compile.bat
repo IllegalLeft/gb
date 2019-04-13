@@ -4,5 +4,6 @@ wla-gb -q -x -o graphics.o graphics.s
 wla-gb -q -x -o strings.o strings.s
 wla-gb -q -x -o songs.o songs.s
 wla-gb -q -x -o music.o music.s
+wla-gb -q -x -o sgb.o sgb.s
 wlalink -S linkfile out.gb
 pause

@@ -9,7 +9,7 @@
 ;
 ;==============================================================================
 
-.INCLUDE "gb_hardware.i"
+.INCLUDE "cgb_hardware.i"
 .INCLUDE "header.i"
 
 ; WRAM Variables
@@ -30,7 +30,11 @@
 .ENDE
 
 ; HRAM constants
+.DEFINE h_CGB	$8D
+.DEFINE h_SGB	$8E
 .ENUM $FF8D	; before this is after the DMA routine
+    CGB			DB	; is gameboy colour?
+    SGB			DB	; is super gameboy?
     joypadStateNew	DB
     joypadStateOld	DB
     joypadStateDiff	DB
@@ -40,7 +44,6 @@
 ;==============================================================================
 ; SUBROUTINES
 ;==============================================================================
-.ORG $3000
 .SECTION "Subroutines" FREE
 
 ; Init Subroutines
@@ -273,6 +276,67 @@ DMACopy:
     .DB $00, $0D    ; assembled DMA subroutine length
 		    ; then assembled DMA subroutine
     .DB $F5, $3E, $C1, $EA, $46, $FF, $3E, $28, $3D, $20, $FD, $F1, $D9
+    ret
+
+DetectSystem:
+    ldh ($8D), a	; save startup value in accumulator
+    ld a, $30
+    ldh (R_P1), a	; reset joypad selector pins for test
+
+    ;MLT_REQ test
+    ld hl, MLT_REQ2P
+    call SGBSend
+    ld a, $30
+    ldh (R_P1), a
+    ldh a, (R_P1)
+    ldh a, (R_P1)
+    ldh a, (R_P1)
+    ld b, a
+    ld a, $20
+    ldh (R_P1), a
+    ld a, $10
+    ldh (R_P1), a
+    ld a, $30
+    ldh (R_P1), a
+    ldh a, (R_P1)
+    ldh a, (R_P1)
+    ldh a, (R_P1)
+    cp b
+    jr nz, @IsSGB
+
+@NotSGB:
+    ldh a, ($8D)
+    cp $01
+    jr z, @DMG
+    cp $FF
+    jr z, @MGB
+    jr @CGB
+@IsSGB:
+    ld hl, MLT_REQ1P
+    call SGBSend
+    ldh a, ($8D)
+    cp $01
+    jr z, @SGB
+    jr @SGB2
+
+@DMG:
+@MGB:
+    xor a
+    ldh (h_CGB), a
+    ldh (h_SGB), a
+    ret
+@CGB:
+    ld a, 1
+    ldh (h_CGB), a
+    xor a
+    ldh (h_SGB), a
+    ret
+@SGB:
+@SGB2:
+    ld a, 1
+    ldh (h_SGB), a
+    xor a
+    ldh (h_CGB), a
     ret
 
 InitCursor:
@@ -668,6 +732,8 @@ Start:
     di
     ld sp, $FFFE    ; setup stack
 
+    call DetectSystem
+
     ld a, %000000001 ; setup interrupts
     ldh ($FF), a
 
@@ -688,6 +754,38 @@ Start:
     ldh ($47), a
     ld a, %11100100	; obj
     ldh ($48), a
+
+    ; CGB palette
+    ldh a, (h_CGB)
+    cp 1
+    jr nz, +
+    ; background palette
+    ld a, $80
+    ldh (R_BCPS), a
+    ld hl, Pal_SeaGreen
+    ld c, 8
+-   ldi a, (hl)
+    ldh (R_BCPD), a
+    dec c
+    jr nz, -
+    ; sprite palette
+    ld a, $80
+    ldh (R_OCPS), a
+    ld hl, Pal_GreyScale
+    ld c, 8
+-   ldi a, (hl)
+    ldh (R_OCPD), a
+    dec c
+    jr nz, -
++
+
+    ; SGB Palette
+    ldh a, (h_SGB)
+    cp 1
+    jr nz, +
+    ld hl, SGBPal_SeaGreen
+    call SGBSend
++
 
     call DMACopy    ; set up DMA subroutine
     call $FF80	    ; DMA routine in HRAM
@@ -986,7 +1084,7 @@ Credits:
 
 ;==============================================================================
 ; DATA
-;==============================================================================
+;l==============================================================================
 .SECTION "MiscData" FREE
 
 
@@ -996,6 +1094,31 @@ FieldAddr:
 CursorPos:  ; yyxx
 .DW $3844, $385C, $3874, $5044, $505C, $5074, $6844, $685C, $6874
 
+.ENDS
+
+.SECTION "Palettes" FREE
+SGBPal_Base:
+.DB ($00 << 3) + 1
+Pal_Base:
+.DW $24A6
+.DW $4609
+.DW $2B72
+.DW $77DC
+.DB $00
+
+SGBPal_SeaGreen:
+.DB ($00 << 3) + 1
+Pal_SeaGreen:
+.DW $7FFA, $4790, $2209, $0920
+.DW $4790, $2209, $0920
+.DB $00
+
+SGBPal_GreyScale:
+.DB ($01 << 3) + 1
+Pal_GreyScale:
+.DW $7FFA, $6B5A, $318C, $0000
+.DW $6B5A, $318C, $0000
+.DB $00
 .ENDS
 
 ; vim: filetype=wla
