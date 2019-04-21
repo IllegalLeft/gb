@@ -19,10 +19,11 @@
     won:	DB
     lost:	DB
     tied:	DB
+    menucursor:	DB		; cursor for menus (line of menu)
     cursorx:	DB		; 0-2
     cursory:	DB		; 0-2
     field:	DS	9	; field is 3x3, 0 empty, 1 x, 2 o
-    seed:	DB		; seed for randint generator
+    seed:	DB		; seed for random integer generator
 .ENDS
 ; $C100 is OAM buffer
 .ENUM $C200
@@ -30,6 +31,7 @@
 .ENDE
 
 ; HRAM constants
+.DEFINE DMARoutine	$FF80
 .DEFINE h_CGB	$8D
 .DEFINE h_SGB	$8E
 .ENUM $FF8D	; before this is after the DMA routine
@@ -39,6 +41,15 @@
     joypadStateOld	DB
     joypadStateDiff	DB
 .ENDE
+
+.DEFINE joy_a	    1 << 0
+.DEFINE joy_b	    1 << 1
+.DEFINE joy_select  1 << 2
+.DEFINE joy_start   1 << 3
+.DEFINE joy_right   1 << 4
+.DEFINE joy_left    1 << 5
+.DEFINE joy_up	    1 << 6
+.DEFINE joy_down    1 << 7
 
 
 ;==============================================================================
@@ -131,6 +142,17 @@ BlankMap:
     jp nz, -
     ret
 
+BlankMapBuffer:
+    ld hl, tilemapbuff
+    ld bc, 1024
+-   xor a
+    ldi (hl), a
+    dec bc
+    ld a, b
+    or c
+    jp nz, -
+    ret
+
 LoadMap:
     ;ld hl, Tiles
     ld de, $9800
@@ -200,10 +222,21 @@ ScreenOff:
     ldh ($40), a
     ret
 
+SoundOn:
+    xor a
+    ldh (R_NR52), a
+    ret
+
+SoundOff:
+    ld a, $80
+    ldh (R_NR52), a
+    ret
+
 FadePause:
     ld a, 2
 -   halt
     nop
+    call UpdateMusic
     dec a
     jp nz, -
     ret
@@ -271,7 +304,7 @@ FadeOutRev:
 
 DMACopy:
     ; https://exez.in/gameboy-dma
-    ld de, $FF80    ; destination of HRAM for DMA routine
+    ld de, DMARoutine	; destination of HRAM for DMA routine
     rst $28
     .DB $00, $0D    ; assembled DMA subroutine length
 		    ; then assembled DMA subroutine
@@ -475,7 +508,7 @@ ReadInput:
 HandleInput:
     ld a, (joypadStateDiff)
     ld b, a
-    and %00010000   ; right
+    and joy_right
     jp z, @noright
     ld a, (cursorx)
     cp 2
@@ -485,7 +518,7 @@ HandleInput:
     call CursorUpdate
 @noright:
     ld a, b
-    and %00100000   ; left
+    and joy_left
     jp z, @noleft
     ld a, (cursorx)
     cp 0
@@ -495,7 +528,7 @@ HandleInput:
     call CursorUpdate
 @noleft:
     ld a, b
-    and %01000000   ; up
+    and joy_up
     jp z, @noup
     ld a, (cursory)
     cp 0
@@ -505,7 +538,7 @@ HandleInput:
     call CursorUpdate
 @noup:
     ld a, b
-    and %10000000   ; down
+    and joy_down
     jp z, @nodown
     ld a, (cursory)
     cp 2
@@ -515,7 +548,7 @@ HandleInput:
     call CursorUpdate
 @nodown:
     ld a, b
-    and %00000001   ; A
+    and joy_a
     jp z, @noa
     ld hl, state    ; is it player's turn?
     ld a, (hl)
@@ -719,7 +752,7 @@ CheckforWin:
     ld a, 3	    ; tie
     ret
 @notie:
-    ld a, 0
+    xor a
     ret
 
 .ENDS
@@ -787,12 +820,16 @@ Start:
     call SGBSend
 +
 
-    call DMACopy    ; set up DMA subroutine
-    call $FF80	    ; DMA routine in HRAM
+    call DMACopy	    ; set up DMA subroutine
+    call DMARoutine	    ; blank sprites
 
     ; setup screen
     ld a, %00010011
     ldh ($40), a
+
+    ; start with sound on
+    ld a, $80
+    ldh (R_NR52), a
 
     ; set random seed
     ld a, 88
@@ -805,27 +842,11 @@ Start:
     ei
 
 SoftReset:
-    ld hl, state
-    ld (hl), $0	; main menu state
-
-    ; reset field
-    ld hl, field
-    ld c, 9
-    xor a
--   ldi (hl), a
-    dec c
-    jp nz, -
-
-    ; reset cursor to center
-    ld a, 1
-    ld (cursorx), a
-    ld (cursory), a
-
     call ScreenOff
     ; font tiles
     ld hl, Tiles
     ld de, $8800
-    ld bc, TileCount
+    ld bc, TileCount+16*1
     call MoveData
     ; load title screen
     ld hl, turt_tile_data
@@ -851,11 +872,9 @@ SoftReset:
     call UpdateScreen
 
     ; setup sound
-    ld a, $80
-    ldh (R_NR52), a
     ld a, $77
     ldh (R_NR50), a
-    ld a, %11111111
+    ld a, $FF
     ldh (R_NR51), a
 
     ld hl, WaveRamp
@@ -864,35 +883,179 @@ SoftReset:
     call LoadMusic
 
     call ScreenOn
-
     call FadeIn
 
 
 TitleScreen:
+    ld hl, state
+    ld (hl), $0	; main menu state
+@loop:
     halt
     nop
-
-    call $FF80	    ; DMA routine in HRAM
-
+    call DMARoutine
     call UpdateMusic
 
     call ReadInput
     ld a, (joypadStateNew)
-    cp %00000101
+    cp (joy_a | joy_select)
     jp z, Credits
     ld a, (joypadStateDiff)
-    and %00001000   ; start
-    jp z, TitleScreen
+    and joy_start
+    jr nz, MainMenu
+    jr @loop
 
+MainMenu:
+    call ScreenOff
+    call BlankMapBuffer
+    xor a
+    ld (menucursor), a
+    ld a, $10
+    ld (cursorx), a
+    ld (cursory), a
+    ; Menu text
+    ld hl, TextMainMenu1
+    ld de, tilemapbuff+($14*6)+5
+    call PrintStr
+    ld hl, TextMainMenu2
+    ld de, tilemapbuff+($14*7)+5
+    call PrintStr
+
+    ; setup cursor oam
+    ld hl, $C100
+    ld a, $40
+    ldi (hl), a
+    ld a, $25
+    ldi (hl), a
+    ld a, $A5
+    ldi (hl), a
+
+    call UpdateScreen
+    call ScreenOn
+@loop:
+    halt
+    nop
+    call DMARoutine
+    call UpdateMusic
+    
+    call ReadInput
+    ld a, (joypadStateDiff)
+    ld b, a
+    and (joy_up | joy_down)
+    jr z, +
+    ld a, (menucursor)
+    cpl
+    and 1
+    ld (menucursor), a
+    ; cursor.y = menucursor*8 + $40
+.REPEAT 3
+    sla a
+.ENDR
+    add $40
+    ld hl, $C100
+    ld (hl), a
+
++   ld a, b
+    and (joy_a | joy_start)
+    jr z, +
+    ld a, (menucursor)
+    cp 0
+    jp z, GameSetup	; New Game
+    cp 1
+    jp z, Options	; Options
+    ld a, b
+
++   jr @loop
+
+Options:
+    call ScreenOff
+    call BlankMapBuffer
+
+    xor a
+    ld (menucursor), a
+    ld a, $10
+    ld (cursorx), a
+    ld (cursory), a
+
+    ;Menu Text
+    ld hl, TextOptions0
+    ld de, tilemapbuff+($14*6)+5
+    call PrintStr
+    ld hl, TextOptions1
+    ld de, tilemapbuff+($14*7)+5
+    call PrintStr
+
+    ; setup cursor oam
+    ld hl, $C100
+    ld a, $40
+    ldi (hl), a
+    ld a, $25
+    ldi (hl), a
+    ld a, $A5
+    ldi (hl), a
+
+    call UpdateScreen
+    call ScreenOn
+@loop:
+    halt
+    nop
+    call DMARoutine
+    call UpdateMusic
+
+    call ReadInput
+    ld a, (joypadStateDiff)
+    ld b, a
+    and (joy_up | joy_down)
+    jr z, +
+    ld a, (menucursor)
+    cpl
+    and 1
+    ld (menucursor), a
+    ; cursor.y = menucursor*8 + $40
+.REPEAT 3
+    sla a
+.ENDR
+    add $40
+    ld hl, $C100
+    ld  (hl), a
+
++   ld a, b
+    and (joy_a | joy_start)
+    jr z, +
+    ld a, (menucursor)
+    cp 0
+    jp nz, ++
+    ldh a, (R_NR52)	    ; toggle sound
+    cpl
+    and 1 << 7
+    ldh (R_NR52), a
+    jr z, +
+    push bc
+    ld a, $77
+    ldh (R_NR50), a
+    ld a, %11111111
+    ldh (R_NR51), a
+    ld hl, WaveRamp
+    call LoadWaveform
+    ld hl, SongTitle	    ; reload song since it was stopped
+    call LoadMusic
+    pop bc
+    jr +
+++  cp 1
+    jp z, MainMenu
+
++   ld a, b
+    and joy_start
+    jp nz, MainMenu
+
+    jr @loop
+    
 
 GameSetup:
+    ldh a, (R_LCDC)	; toggle objs
+    res 1, a
+    ldh (R_LCDC), a
     call FadeOut
     call ScreenOff
-
-    ; turn off sound
-    xor a
-    ldh (R_NR52), a
-
 
     call BlankMap
     call BlankSprites
@@ -900,7 +1063,7 @@ GameSetup:
     ; font tiles
     ld hl, Tiles
     ld de, $8800
-    ld bc, TileCount
+    ld bc, TileCount+16*1
     call MoveData
 
     ld hl, shell_tile_data
@@ -912,6 +1075,19 @@ GameSetup:
     call MoveData
     ld hl, shell_map_data
     call LoadScreen
+
+    ; reset field
+    ld hl, field
+    ld c, 9
+    xor a
+-   ldi (hl), a
+    dec c
+    jp nz, -
+
+    ; reset cursor to center
+    ld a, 1
+    ld (cursorx), a
+    ld (cursory), a
 
     call InitCursor
     call CursorUpdate
@@ -944,15 +1120,24 @@ GameSetup:
     ld de, $9872
     call PrintInt
 
+    ldh a, (R_NR51)
+    res 5, a
+    res 1, a
+    ldh (R_NR51), a
+
+    call DMARoutine
     call ScreenOn
 
     call FadeIn
+    ldh a, (R_LCDC)	; toggle objs
+    set 1, a
+    ldh (R_LCDC), a
 
 MainLoop:
     halt
     nop
-
-    call $FF80		    ; DMA routine in HRAM
+    call DMARoutine
+    call UpdateMusic
 
     call ReadInput
     call HandleInput
@@ -1019,16 +1204,17 @@ EndGame:
     call CursorMove
     halt    ; wait for VBlank
     nop
-    call $FF80		    ; DMA routine in HRAM
+    call DMARoutine
 
 @endloop:
     halt
     nop
 
+    call UpdateMusic
     call ReadInput
     
     ld a, (joypadStateDiff)
-    and %00001111
+    and (joy_a | joy_b | joy_start | joy_select)
     jp z, @endloop
     call FadeOut
     jp SoftReset
@@ -1072,6 +1258,8 @@ Credits:
 @loop:
     halt
     nop
+    call DMARoutine
+    call UpdateMusic
 
     call ReadInput
     ld a, (joypadStateDiff)

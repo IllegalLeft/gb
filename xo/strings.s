@@ -29,6 +29,16 @@ TextLose:
 TextTie:
 .ASC "YOU TIE@"
 
+TextMainMenu1:
+.ASC "NEW GAME@"
+TextMainMenu2:
+.ASC "OPTIONS@"
+
+TextOptions0:
+.ASC "SOUND@"
+TextOptions1:
+.ASC "EXIT@"
+
 Credits1a:
 .ASC "CODE  ART  MUSIC@"
 Credits1b:

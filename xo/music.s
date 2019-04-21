@@ -103,6 +103,11 @@ UpdateMusic:
     ret nz			; no update needed
     xor a			; zero music counter, will do an update
     ld (MusicTicks), a
+
+    ; check NR52 if sound system is even on
+    ldh a, (R_NR52)
+    bit 7, a
+    ret z
     
     ld c, 0			; start with channel 0
     ld b, 0

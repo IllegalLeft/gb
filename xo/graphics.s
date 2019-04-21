@@ -10,6 +10,10 @@
 Tiles:
 .INCBIN "numbers.bin"	FSIZE size_of_numbers
 .INCBIN "alphas.bin"	FSIZE size_of_alphas
+menucursor_data:
+.DB $C0,$C0,$F0,$F0,$FC,$FC,$FF,$FF
+.DB $FF,$FF,$FC,$FC,$F0,$F0,$C0,$C0
+
 
 .INCLUDE "turt.i"
 .INCLUDE "shell.i"
