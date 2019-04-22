@@ -14,6 +14,7 @@
 
 ; WRAM Variables
 .RAMSECTION "Variables" SLOT 2	; Internal WRAM
+    vbcounter:	DB		; counter for vblank
     state:	DB		; 0 main menu, 1 xturn, 2 oturn, 3 end game
     initiator:	DB		; holds player who started last
     won:	DB
@@ -24,6 +25,7 @@
     cursory:	DB		; 0-2
     field:	DS	9	; field is 3x3, 0 empty, 1 x, 2 o
     seed:	DB		; seed for random integer generator
+    menubgtile: DB		; tile index for menu bg tile
 .ENDS
 ; $C100 is OAM buffer
 .ENUM $C200
@@ -1030,6 +1032,27 @@ MainMenu:
     nop
     call DMARoutine
     call UpdateMusic
+
+    ; rotate bg tile
+    ld a, (vbcounter)
+    and %00000011
+    cp $3
+    jr nz, ++
+    ld a, (menubgtile)		; load tile index # and increment
+    inc a
+    cp $4
+    jr nz, +
+    xor a
++   ld (menubgtile), a
+    ld hl, menubg_data		; move new tile data into tile memory
+    swap a			; a*16 into bc
+    ld c, a
+    ld b, 0
+    add hl, bc
+    ld de, $8000+($AE*16)
+    ld bc, 16
+    call MoveData
+++
     
     call ReadInput
     ld a, (joypadStateDiff)
@@ -1099,6 +1122,27 @@ Options:
     call DMARoutine
     call UpdateMusic
 
+    ; rotate bg tile
+    ld a, (vbcounter)
+    and %00000011
+    cp $3
+    jr nz, ++
+    ld a, (menubgtile)		; load tile index # and increment
+    inc a
+    cp $4
+    jr nz, +
+    xor a
++   ld (menubgtile), a
+    ld hl, menubg_data		; move new tile data into tile memory
+    swap a			; a*16 into bc
+    ld c, a
+    ld b, 0
+    add hl, bc
+    ld de, $8000+($AE*16)
+    ld bc, 16
+    call MoveData
+++
+
     call ReadInput
     ld a, (joypadStateDiff)
     ld b, a
@@ -1145,7 +1189,7 @@ Options:
     and joy_start
     jp nz, MainMenu
 
-    jr @loop
+    jp @loop
     
 
 GameSetup:

@@ -45,6 +45,10 @@ CopyData:
 .ORG $38    ; Reset $38
     ;jp $100	; is overwritten above
 .ORG $40    ; Vblank IRQ Vector
+    push hl
+    ld hl, vbcounter
+    inc (hl)
+    pop hl
     reti
 .ORG $48    ; LCD IRQ Vector
     reti
