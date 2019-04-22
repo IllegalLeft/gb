@@ -153,6 +153,20 @@ BlankMapBuffer:
     jp nz, -
     ret
 
+FillMapBuffer:
+    ; Fills the map buffer with a single tile
+    ; a	    tile to fill
+    ld d, a
+    ld hl, tilemapbuff
+    ld bc, 1024
+-   ld a, d
+    ldi (hl), a
+    dec bc
+    ld a, b
+    or c
+    jp nz, -
+    ret
+
 LoadMap:
     ;ld hl, Tiles
     ld de, $9800
@@ -441,6 +455,80 @@ CursorUpdate:
     ld e, a
     ld d, (hl)	    ; second byte
     call CursorMove
+    ret
+
+DrawMenuBox:
+.DEFINE tile_empty  0
+.DEFINE tile_boxtl  $A6
+.DEFINE tile_boxtr  $A7
+.DEFINE tile_boxbr  $A8
+.DEFINE tile_boxbl  $A9
+.DEFINE tile_boxt   $AA
+.DEFINE tile_boxl   $AB
+.DEFINE tile_boxb   $AC
+.DEFINE tile_boxr   $AD
+    ; Draws a box with the screen in the top left of the map
+    ; b	    x of top left of box
+    ; c	    y of top left of box
+    ; d	    width
+    ; e	    height
+    ld hl, tilemapbuff+$53
+    ld de, $6
+    ld b, 5	    ; y of box
+    ; first row
+    ld c, 14	    ; x of box
+    ld a, tile_boxtl
+    ldi (hl), a
+    dec c
+-   ld a, tile_boxt
+    ldi (hl), a
+    dec c
+    ld a, c
+    cp 1
+    jr nz, -
+    ld a, tile_boxtr
+    ldi (hl), a
+    dec c
+    add hl, de	    ; next row
+
+    ; middle rows
+--  ld c, 14
+-   ld a, c
+    cp 14
+    jr z, @right
+    cp 1
+    jr z, @left
+@empty:
+    ld a, tile_empty
+    jr +
+@left:
+    ld a, tile_boxl
+    jr +
+@right:
+    ld a, tile_boxr
++   ldi (hl), a
+    dec c
+    jr nz, -
+    add hl, de
+    dec b
+    ld a, b
+    cp 1
+    jr nz, --
+    
+    ;last row
+    ld c, 14
+    ld a, tile_boxbl
+    ldi (hl), a
+    dec c
+-   ld a, tile_boxb
+    ldi (hl), a
+    dec c
+    ld a, c
+    cp 1
+    jr nz, -
+    ld a, tile_boxbr
+    ldi (hl), a
+    ;dec c
     ret
 
 PrintStr:
@@ -846,7 +934,7 @@ SoftReset:
     ; font tiles
     ld hl, Tiles
     ld de, $8800
-    ld bc, TileCount+16*1
+    ld bc, TileCount
     call MoveData
     ; load title screen
     ld hl, turt_tile_data
@@ -907,24 +995,30 @@ TitleScreen:
 MainMenu:
     call ScreenOff
     call BlankMapBuffer
+    ld a, $AE
+    call FillMapBuffer
+
     xor a
     ld (menucursor), a
     ld a, $10
     ld (cursorx), a
     ld (cursory), a
+
+    call DrawMenuBox
+
     ; Menu text
     ld hl, TextMainMenu1
-    ld de, tilemapbuff+($14*6)+5
+    ld de, tilemapbuff+($14*6)+6
     call PrintStr
     ld hl, TextMainMenu2
-    ld de, tilemapbuff+($14*7)+5
+    ld de, tilemapbuff+($14*7)+6
     call PrintStr
 
     ; setup cursor oam
     ld hl, $C100
     ld a, $40
     ldi (hl), a
-    ld a, $25
+    ld a, $2A
     ldi (hl), a
     ld a, $A5
     ldi (hl), a
@@ -969,6 +1063,8 @@ MainMenu:
 Options:
     call ScreenOff
     call BlankMapBuffer
+    ld a, $AE
+    call FillMapBuffer
 
     xor a
     ld (menucursor), a
@@ -976,19 +1072,21 @@ Options:
     ld (cursorx), a
     ld (cursory), a
 
-    ;Menu Text
+    call DrawMenuBox
+
+    ; menu text
     ld hl, TextOptions0
-    ld de, tilemapbuff+($14*6)+5
+    ld de, tilemapbuff+($14*6)+6
     call PrintStr
     ld hl, TextOptions1
-    ld de, tilemapbuff+($14*7)+5
+    ld de, tilemapbuff+($14*7)+6
     call PrintStr
 
     ; setup cursor oam
     ld hl, $C100
     ld a, $40
     ldi (hl), a
-    ld a, $25
+    ld a, $2A
     ldi (hl), a
     ld a, $A5
     ldi (hl), a
@@ -1063,7 +1161,7 @@ GameSetup:
     ; font tiles
     ld hl, Tiles
     ld de, $8800
-    ld bc, TileCount+16*1
+    ld bc, TileCount
     call MoveData
 
     ld hl, shell_tile_data

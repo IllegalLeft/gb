@@ -10,9 +10,7 @@
 Tiles:
 .INCBIN "numbers.bin"	FSIZE size_of_numbers
 .INCBIN "alphas.bin"	FSIZE size_of_alphas
-menucursor_data:
-.DB $C0,$C0,$F0,$F0,$FC,$FC,$FF,$FF
-.DB $FF,$FF,$FC,$FC,$F0,$F0,$C0,$C0
+.INCLUDE "menutiles.i"
 
 
 .INCLUDE "turt.i"
@@ -20,7 +18,7 @@ menucursor_data:
 .INCLUDE "ox.i"
 .INCLUDE "cursor.i"
 
-.DEFINE TileCount	size_of_numbers + size_of_alphas
+.DEFINE TileCount	size_of_numbers + size_of_alphas + menutiles_count
 .EXPORT TileCount
 
 .ENDS
