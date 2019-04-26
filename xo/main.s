@@ -11,6 +11,7 @@
 
 .INCLUDE "cgb_hardware.i"
 .INCLUDE "header.i"
+.INCLUDE "palettes.i"
 
 ; WRAM Variables
 .RAMSECTION "Variables" SLOT 2	; Internal WRAM
@@ -60,58 +61,11 @@
 .SECTION "Subroutines" FREE
 
 ; Init Subroutines
-BlankSprites:
-    ld hl, $8000
-    ld bc, 4080
--   ld a, 0
-    ldi (hl), a
-    dec bc
-    ld a, b
-    or c
-    jp nz, -
-    ret
-
-BlankOAM:
-    ld hl, $C100
-    ld bc, 160	; entries
--   ld a, 0
-    ldi (hl), a
-    dec bc
-    ld a, b
-    or c
-    jp nz, -
-    ret
-
-BlankWRAM:
-    ld hl, $C000    ; WRAM
-    ld bc, $2000    ; counter
--   ld a, 0
-    ldi (hl), a
-    dec bc
-    ld a, b
-    or c
-    jp nz, -
-    ret
-
-LoadTiles:
-    ; hl    tile source address
-    ; bc    # of bytes to load (tiles * 16)
-    ld de, $8000
-    ;ld bc, TileCount
--   ldi a, (hl)
-    ld (de), a
-    inc de
-    dec bc
-    ld a, b
-    or c
-    jp nz, -
-    ret
-
 BlankData:
     ; a	    value
     ; hl    destination
     ; bc    length/size
-    ld d, a	; will need to retrieve later
+    ld d, a			; will need to retrieve later
 -   ldi (hl), a
     dec bc
     ld a, b
@@ -133,28 +87,6 @@ MoveData:
     jp nz, -
     ret
 
-BlankMap:
-    ld hl, $9800
-    ld bc, 1024
--   ld a, 0
-    ldi (hl), a
-    dec bc
-    ld a, b
-    or c
-    jp nz, -
-    ret
-
-BlankMapBuffer:
-    ld hl, tilemapbuff
-    ld bc, 1024
--   xor a
-    ldi (hl), a
-    dec bc
-    ld a, b
-    or c
-    jp nz, -
-    ret
-
 FillMapBuffer:
     ; Fills the map buffer with a single tile
     ; a	    tile to fill
@@ -163,19 +95,6 @@ FillMapBuffer:
     ld bc, 1024
 -   ld a, d
     ldi (hl), a
-    dec bc
-    ld a, b
-    or c
-    jp nz, -
-    ret
-
-LoadMap:
-    ;ld hl, Tiles
-    ld de, $9800
-    ;ld bc, TileCount
--   ldi a, (hl)
-    ld (de), a
-    inc de
     dec bc
     ld a, b
     or c
@@ -225,17 +144,17 @@ UpdateScreen:
     ret
 
 ScreenOn:
-    ldh a, ($40)
+    ldh a, (R_LCDC)
     or %10000000
-    ldh ($40), a
+    ldh (R_LCDC), a
     ret
 
 ScreenOff:
     halt    ; wait for VBlank
     nop
-    ldh a, ($40)
+    ldh a, (R_LCDC)
     xor %10000000
-    ldh ($40), a
+    ldh (R_LCDC), a
     ret
 
 SoundOn:
@@ -259,62 +178,62 @@ FadePause:
 
 FadeInRev:
     ld a, %11111111
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ld a, %11111110
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ld a, %11111010
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ld a, %11100100
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ret
 
 FadeIn:
     ld a, %00000000
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ld a, %01000000
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ld a, %10010100
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ld a, %11100100
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ret
 
 FadeOut:
     ld a, %11100100
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ld a, %10100100
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ld a, %01010000
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ld a, %00000000
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ret
 
 
 FadeOutRev:
     ld a, %11100100
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ld a, %11111001
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ld a, %11111110
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ld a, %11111111
-    ldh ($47), a
+    ldh (R_BGP), a
     call FadePause
     ret
 
@@ -858,7 +777,7 @@ Start:
     call DetectSystem
 
     ld a, %000000001 ; setup interrupts
-    ldh ($FF), a
+    ldh (R_IE), a
 
     ; wait for vblank
     halt
@@ -867,16 +786,25 @@ Start:
     call ScreenOff
 
     ; Blank a buncha stuff
-    call BlankWRAM
-    call BlankOAM
-    call BlankSprites
-    call BlankMap
+    xor a
+    ld hl, $C000	    ; blank WRAM
+    ld bc, $2000
+    call BlankData
+    ld hl, $C100	    ; blank OAM buffer
+    ld bc, 160	; entries
+    call BlankData
+    ld hl, $8000	    ; blank sprites
+    ld bc, 4080
+    call BlankData
+    ld hl, $9800	    ; blank map
+    ld bc, 1024
+    call BlankData
 
     ; load palette
     ld a, %00000000	; bg
-    ldh ($47), a
+    ldh (R_BGP), a
     ld a, %11100100	; obj
-    ldh ($48), a
+    ldh (R_OBP0), a
 
     ; CGB palette
     ldh a, (h_CGB)
@@ -915,7 +843,7 @@ Start:
 
     ; setup screen
     ld a, %00010011
-    ldh ($40), a
+    ldh (R_LCDC), a
 
     ; start with sound on
     ld a, $80
@@ -957,7 +885,10 @@ SoftReset:
     ld de, tilemapbuff+($14*$10)+$4
     call PrintStr
 
-    call BlankOAM
+    xor a
+    ld hl, $C100		; blank OAM buffer
+    ld bc, 160
+    call BlankData
 
     call UpdateScreen
 
@@ -996,7 +927,9 @@ TitleScreen:
 
 MainMenu:
     call ScreenOff
-    call BlankMapBuffer
+    ld hl, tilemapbuff		    ; blank map buffer
+    ld bc, 1024
+    call BlankData
     ld a, $AE
     call FillMapBuffer
 
@@ -1085,7 +1018,9 @@ MainMenu:
 
 Options:
     call ScreenOff
-    call BlankMapBuffer
+    ld hl, tilemapbuff		    ; blank map buffer
+    ld bc, 1024
+    call BlankData
     ld a, $AE
     call FillMapBuffer
 
@@ -1193,14 +1128,19 @@ Options:
     
 
 GameSetup:
-    ldh a, (R_LCDC)	; toggle objs
+    ldh a, (R_LCDC)	    ; toggle objs
     res 1, a
     ldh (R_LCDC), a
     call FadeOut
     call ScreenOff
 
-    call BlankMap
-    call BlankSprites
+    xor a
+    ld hl, $9800	    ; blank map
+    ld bc, 1024
+    call BlankData
+    ld hl, $8000	    ; blank sprites
+    ld bc, 4080
+    call BlankData
 
     ; font tiles
     ld hl, Tiles
@@ -1209,8 +1149,9 @@ GameSetup:
     call MoveData
 
     ld hl, shell_tile_data
+    ld de, $8000
     ld bc, $420+16*12
-    call LoadTiles
+    call MoveData
     ld hl, cursor_tile_data
     ld de, $8500
     ld bc, cursor_tile_data_size
@@ -1336,7 +1277,7 @@ EndGame:
     adc 1
     daa
     ld (tied), a
-    halt    ; wait for VBlank
+    halt		; wait for VBlank
     nop
     ld hl, TextTie
     ld de, $9826
@@ -1344,7 +1285,7 @@ EndGame:
 @end:
     ld de, $0000
     call CursorMove
-    halt    ; wait for VBlank
+    halt		; wait for VBlank
     nop
     call DMARoutine
 
@@ -1366,9 +1307,13 @@ Credits:
     call FadeOut
     call ScreenOff
 
-    call BlankMap
-    call BlankSprites
     xor a
+    ld hl, $9800	; Blank map
+    ld bc, 1024
+    call BlankData
+    ld hl, $8000	; Blank mprites
+    ld bc, 4080
+    call BlankData
     ld hl, tilemapbuff
     ld bc, 20*18
     call BlankData
@@ -1417,38 +1362,12 @@ Credits:
 ;l==============================================================================
 .SECTION "MiscData" FREE
 
-
 FieldAddr:
 .DW $98A6, $98A9, $98AC, $9906, $9909, $990C, $9966, $9969, $996C
 
 CursorPos:  ; yyxx
 .DW $3844, $385C, $3874, $5044, $505C, $5074, $6844, $685C, $6874
 
-.ENDS
-
-.SECTION "Palettes" FREE
-SGBPal_Base:
-.DB ($00 << 3) + 1
-Pal_Base:
-.DW $24A6
-.DW $4609
-.DW $2B72
-.DW $77DC
-.DB $00
-
-SGBPal_SeaGreen:
-.DB ($00 << 3) + 1
-Pal_SeaGreen:
-.DW $7FFA, $4790, $2209, $0920
-.DW $4790, $2209, $0920
-.DB $00
-
-SGBPal_GreyScale:
-.DB ($01 << 3) + 1
-Pal_GreyScale:
-.DW $7FFA, $6B5A, $318C, $0000
-.DW $6B5A, $318C, $0000
-.DB $00
 .ENDS
 
 ; vim: filetype=wla
