@@ -1,0 +1,6 @@
+[objects]
+graphics.o
+interrupts.o
+main.o
+memory.o
+strings.o
