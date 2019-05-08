@@ -14,13 +14,13 @@
 ; WRAM DEFINITIONS
 ;==============================================================================
 
-.RAMSECTION "MusicVars" SLOT 2 APPENDTO "Variables" ; Internal WRAM
+.ENUM $C0A0 EXPORT
     MusicTicks:		db
     MusicTickLimit:	db
     MusicPointer:	dsw 4
     MusicTimers:	ds  4
     MusicVoices:	dsw 3
-.ENDS
+.ENDE
 
 .DEF MusicChannels  4	    ; total number of music channels
 

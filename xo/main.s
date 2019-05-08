@@ -14,7 +14,7 @@
 .INCLUDE "palettes.i"
 
 ; WRAM Variables
-.RAMSECTION "Variables" SLOT 2	; Internal WRAM
+.ENUM $C000 EXPORT
     vbcounter:	DB		; counter for vblank
     state:	DB		; 0 main menu, 1 xturn, 2 oturn, 3 end game
     initiator:	DB		; holds player who started last
@@ -24,11 +24,20 @@
     menucursor:	DB		; cursor for menus (line of menu)
     cursorx:	DB		; 0-2
     cursory:	DB		; 0-2
-    field:	DS	9	; field is 3x3, 0 empty, 1 x, 2 o
+    field:	DS 9		; field is 3x3, 0 empty, 1 x, 2 o
     seed:	DB		; seed for random integer generator
     menubgtile: DB		; tile index for menu bg tile
-.ENDS
-; $C100 is OAM buffer
+.ENDE
+.DEFINE OAMbuffer $C100
+.STRUCT OAMentry
+    y		DB
+    x		DB
+    tile	DB
+    attr	DB
+.ENDST
+.ENUM OAMbuffer EXPORT
+    OAM:	INSTANCEOF OAMentry 40
+.ENDE
 .ENUM $C200
     tilemapbuff	DS	20*18	; tilemap buffer
 .ENDE
@@ -310,7 +319,7 @@ DetectSystem:
 InitCursor:
     ld a, $50	    ; tile #
     ld e, 4	    ; 4 sprites
-    ld hl, $C100    ; starting of OAM buffer
+    ld hl, OAMbuffer; starting of OAM buffer
 
     ; tile number
 -   inc hl	    ; skip y
@@ -330,7 +339,7 @@ CursorMove:
     ; e	    x ordinate
     ld a, e
     ldh ($90), a    ; store x ord for later
-    ld hl, $C100    ; starting of OAM buffer
+    ld hl, OAMbuffer; starting of OAM buffer
     ;ld d, 16	    ; y ord
     ld b, 2	    ; y
 --  ldh a, ($90)    ; x ord
@@ -790,9 +799,6 @@ Start:
     ld hl, $C000	    ; blank WRAM
     ld bc, $2000
     call BlankData
-    ld hl, $C100	    ; blank OAM buffer
-    ld bc, 160	; entries
-    call BlankData
     ld hl, $8000	    ; blank sprites
     ld bc, 4080
     call BlankData
@@ -886,7 +892,7 @@ SoftReset:
     call PrintStr
 
     xor a
-    ld hl, $C100		; blank OAM buffer
+    ld hl, OAMbuffer	; blank OAM buffer
     ld bc, 160
     call BlankData
 
@@ -950,7 +956,7 @@ MainMenu:
     call PrintStr
 
     ; setup cursor oam
-    ld hl, $C100
+    ld hl, OAMbuffer
     ld a, $40
     ldi (hl), a
     ld a, $2A
@@ -1001,7 +1007,7 @@ MainMenu:
     sla a
 .ENDR
     add $40
-    ld hl, $C100
+    ld hl, OAMbuffer
     ld (hl), a
 
 +   ld a, b
@@ -1041,7 +1047,7 @@ Options:
     call PrintStr
 
     ; setup cursor oam
-    ld hl, $C100
+    ld hl, OAMbuffer
     ld a, $40
     ldi (hl), a
     ld a, $2A
@@ -1092,7 +1098,7 @@ Options:
     sla a
 .ENDR
     add $40
-    ld hl, $C100
+    ld hl, OAMbuffer
     ld  (hl), a
 
 +   ld a, b
