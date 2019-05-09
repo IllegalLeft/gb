@@ -14,20 +14,19 @@ Start:
     ld a, $01
     ldh (R_IE), a	    ; vblank enabled
 
+-   ld a, (LY)              ; wait for vblank
+    cp $91
+    jr nz, -
     xor a		    ; turn off screen
     ldh (R_LCDC), a
     ldh (R_NR52), a	    ; turn off sound
 
-    xor a
     ld hl, $C000
     ld bc, $2000
     call BlankData	    ; blank RAM
     ld hl, $8000
     ld bc, $2000
     call BlankData	    ; blank VRAM
-    ld hl, $FF80
-    ld bc, $7C
-    call BlankData	    ; blank HRAM
 
     call DMACopy	    ; setup DMA Routine
     call DMARoutine
@@ -91,3 +90,5 @@ test_inv:
 .DB 0, 0
 .DB 0, 0
 .ENDS
+
+; vim: filetype=wla

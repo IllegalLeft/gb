@@ -29,3 +29,5 @@ MoveData:
     ret
 
 .ENDS
+
+; vim: filetype=wla
