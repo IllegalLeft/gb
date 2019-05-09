@@ -1,6 +1,7 @@
 .INCLUDE "gb_hardware.i"
 .INCLUDE "header.i"
 .INCLUDE "hram.i"
+.INCLUDE "wram.i"
 
 .DEFINE OAM_Buffer $C100
 
@@ -24,6 +25,9 @@ Start:
     ld hl, $8000
     ld bc, $2000
     call BlankData	    ; blank VRAM
+    ld hl, $FF80
+    ld bc, $7C
+    call BlankData	    ; blank HRAM
 
     call DMACopy	    ; setup DMA Routine
     call DMARoutine
@@ -41,9 +45,15 @@ Start:
     ld hl, invbg_map_data
     call LoadScreen
 
-    ld hl, Text_Items
-    ld de, $9863
-    call PrintStr
+    ; load test inventory
+    ld hl, test_inv
+    ld de, w_inv
+    ld bc, 14 * 2 ;bytes
+    call MoveData
+
+    call Inv_DrawInv
+    ;ld a, 0
+    ;call Inv_DrawText
 
     ld a, %11100100
     ldh (R_BGP), a	    ; background palette
@@ -62,3 +72,22 @@ Loop:
     nop
     call DMARoutine
     jr Loop
+
+
+.SECTION "MiscData" FREE
+test_inv:
+.DB 1, 1
+.DB 2, 3
+.DB 3, 15
+.DB 0, 0
+.DB 0, 0
+.DB 0, 0
+.DB 0, 0
+.DB 0, 0
+.DB 0, 0
+.DB 0, 0
+.DB 0, 0
+.DB 0, 0
+.DB 0, 0
+.DB 0, 0
+.ENDS

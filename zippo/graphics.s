@@ -52,3 +52,5 @@ PrintStr:
 .INCLUDE "font_tombi.i"
 
 .ENDS
+
+;vim: set filetype=wla

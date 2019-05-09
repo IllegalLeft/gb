@@ -1,6 +1,7 @@
 [objects]
 graphics.o
 interrupts.o
+inventory.o
 main.o
 memory.o
 strings.o
