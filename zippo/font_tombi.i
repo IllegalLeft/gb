@@ -4,8 +4,9 @@
 ; //             //
 ; /////////////////
 
-.DEFINE font_tombi_tile_data_size  $04B0
+;.DEFINE font_tombi_tile_data_size  $04B0
 .DEFINE font_tombi_tile_count	27
+.DEFINE font_tombi_tile_data_size  $01B0
 .EXPORT font_tombi_tile_data_size, font_tombi_tile_count
 
 ; ////////////////

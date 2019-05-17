@@ -41,6 +41,11 @@ Start:
     ld bc, font_tombi_tile_data_size
     call MoveData
 
+    ld hl, items_tile_data
+    ld de, $8700
+    ld bc, items_tile_data_size
+    call MoveData
+
     ld hl, invbg_map_data
     call LoadScreen
 
@@ -86,7 +91,7 @@ test_inv:
 .DB 0, 0
 .DB 0, 0
 .DB 0, 0
-.DB 0, 0
+.DB 3, 1
 .DB 0, 0
 .DB 0, 0
 .ENDS

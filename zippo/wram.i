@@ -7,4 +7,4 @@ amount  DB
 w_inv       INSTANCEOF  item 14
 .ENDE
 
-;vim: filetype=wla
+; vim: filetype=wla

@@ -50,6 +50,7 @@ PrintStr:
 
 .INCLUDE "invbg.i"
 .INCLUDE "font_tombi.i"
+.INCLUDE "items.i"
 
 .ENDS
 

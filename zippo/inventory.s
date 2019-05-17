@@ -31,7 +31,7 @@ Inv_DrawText:
     ; a     inventory entry #
     push af
     sla a   ; *2
-    ld hl, $C000
+    ld hl, w_inv
     add l
     ld l, a
     ld a, 0
@@ -69,6 +69,59 @@ Inv_DrawText:
     call Inv_PrintItem
     ret
 
+Inv_DrawIcon:
+    ; a	    inventory id
+    ; get inventory item id
+    push af
+    sla a
+    ld hl, w_inv
+    add l
+    ld l, a
+    ld a, 0
+    adc h
+    ld h, a
+    ld a, (hl)
+    sla a   ;
+    sla a   ; *4
+    ; get tile start
+    ld b, $70 ; start of tiles
+    add b
+    ld b, a
+    ; get map addr
+    ld hl, $9861    ; start of icon map address
+    pop af	    ; get item id back
+    cp 6
+    jr c, @firstcol
+    ld de, 9
+    add hl, de
+    sub 7
+@firstcol:
+    ld c, a	    ; row # in c
+-   xor a
+    or c
+    jr z, @edittiles
+    ld a, $40	    ; every row tile addr is $40 away from eachother
+    add l
+    ld l, a
+    ld a, 0
+    adc h
+    ld h, a
+    dec c
+    jr -
+    
+@edittiles:
+    ; place/edit the 4 tiles
+    ld a, b
+    ldi (hl), a
+    inc a
+    ld (hl), a
+    inc a
+    ld bc, $20-1
+    add hl, bc
+    ldi (hl), a
+    inc a
+    ld (hl), a
+    ret
 
 Inv_DrawInv:
     ld c, Inv_MaxItems
@@ -76,6 +129,11 @@ Inv_DrawInv:
 -   push af
     push bc
     call Inv_DrawText
+    pop bc
+    pop af
+    push af
+    push bc
+    call Inv_DrawIcon
     pop bc
     pop af
     inc a
