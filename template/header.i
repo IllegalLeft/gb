@@ -1,7 +1,11 @@
+;==============================================================================
+; Header
+;==============================================================================
+
 .GBHEADER
     NAME "TITLE"
     CARTRIDGETYPE $00 ; RAM only
-    RAMSIZE $00 ; 32KByte, no ROM banking
+    RAMSIZE $00 ; 32KByte, no banks
     COUNTRYCODE $01 ; outside Japan
     NINTENDOLOGO
     LICENSEECODENEW "SV"

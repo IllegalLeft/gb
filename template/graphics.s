@@ -19,3 +19,5 @@ DMACopy:
 ;.INCLUDE "graphic.i"
 
 .ENDS
+
+; vim: filetype=wla
