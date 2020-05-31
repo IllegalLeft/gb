@@ -28,7 +28,7 @@ Whippet runs along a beach!
 ### Scroll
 Scrolls vertically for a 256 tile high map. Actual tilemap is not that large so there is a lot of whitespace in there.
 
-![scroll screenshot](scroll/screenshot.bmp)
+![scroll screenshot](scroll/screenshot.png)
 
 ### Sprite
 Simple sprite on screen and D-pad moves it around.
