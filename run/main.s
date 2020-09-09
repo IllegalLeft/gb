@@ -11,6 +11,8 @@
 ;
 ;==============================================================================
 
+.INCLUDE "gb_hardware.i"
+
 .GBHEADER
     NAME "RUN"
     CARTRIDGETYPE $00 ; RAM only
@@ -32,28 +34,36 @@
 .ROMBANKSIZE $4000
 .ROMBANKS 2
 
-; WRAM Variables
-.DEFINE DogeX $C000
-.DEFINE DogeY $C001
-.DEFINE DogeFrame $C002
-.DEFINE MapX $C004
-.DEFINE MapY $C005
-.DEFINE CloudY $C006
-.DEFINE CloudX $C007
-.DEFINE Cloud2Y $C008
-.DEFINE Cloud2X $C009
-.DEFINE GrassY $C00A
-.DEFINE GrassX $C00B
-.DEFINE Grass2Y $C00C
-.DEFINE Grass2X $C00D
-.DEFINE Grass3Y	$C00E
-.DEFINE Grass3X	$C00F
+
+.DEFINE DMARoutine  $FF80
+
+;==============================================================================
+; WRAM
+;==============================================================================
+.ENUM $C000
+    DogeX	DB
+    DogeY	DB
+    DogeFrame	DW
+    MapX	DB
+    MapY	DB
+    CloudY	DB
+    CloudX	DB
+    Cloud2Y	DB
+    Cloud2X	DB
+    GrassY	DB
+    GrassX	DB
+    Grass2Y	DB
+    Grass2X	DB
+    Grass3Y	DB
+    Grass3X	DB
+.ENDE
 
 ; WRAM Addresses for specifc OAMs
-.DEFINE Doge $C100
-.DEFINE Cloud Doge+(16*4) 
-.DEFINE Cloud2 Cloud+(4*4)
-.DEFINE Grass Cloud2+(4*4)
+.DEFINE OAMBuffer   $C100
+.DEFINE Doge	    $C100
+.DEFINE Cloud	    Doge+(16*4) 
+.DEFINE Cloud2	    Cloud+(4*4)
+.DEFINE Grass	    Cloud2+(4*4)
 
 ;==============================================================================
 ; GAMEBOY HEADER
@@ -69,35 +79,12 @@
     jp $100
 .ORG $20    ; Reset $20
     jp $100
-.ORG $28    ; Reset $28	- Copy Data routine
-CopyData:
-    pop hl  ; pop return address off stack
-    push bc
-
-    ; get number of bytes to copy
-    ; hl contains the address of the bytes following the rst call
-    ldi a, (hl)
-    ld b, a
-    ldi a, (hl)
-    ld c, a
-
--   ldi a, (hl)	; start transfering data
-    ld (de), a
-    inc de
-    dec bc
-    ld a, b
-    or c
-    jr nz, -
-
-    ; all done
-    pop bc
-    jp hl
-    reti
-
+.ORG $28    ; Reset $28
+    jp $100
 .ORG $30    ; Reset $30
-    ;jp $100	; is overwritten above
+    jp $100
 .ORG $38    ; Reset $38
-    ;jp $100	; is overwritten above
+    jp $100
 .ORG $40    ; Vblank IRQ Vector
     reti
 .ORG $48    ; LCD IRQ Vector
@@ -219,14 +206,13 @@ WaitVBlank:
     jr nz, WaitVBlank
     ret
 
-DMACopy:
-    ld de, $FF80    ; destination of HRAM for DMA routine
-    rst $28
-    .DB $00, $0D    ; assembled DMA subroutine length
-		    ; then assembled DMA subroutine
-    .DB $F5, $3E, $C1, $EA, $46, $FF, $3E, $28, $3D, $20, $FD, $F1, $D9
+DMARoutineOriginal:
+    ld a, >OAMBuffer
+    ldh (R_DMA), a
+    ld a, $28	    ; 5x40 cycles, approx. 200ms
+-   dec a
+    jr nz, -
     ret
-
 
 ; Sprite Subroutines
 InitDoge:   ; setup oam in wram for doge sprites
@@ -583,7 +569,10 @@ Start:
     ld a, %00011011	; obj
     ldh ($48), a
 
-    call DMACopy ; set up DMA subroutine
+    ld hl, DMARoutineOriginal
+    ld de, DMARoutine
+    ld bc, _sizeof_DMARoutineOriginal
+    call MoveData
 
     ; doge
     call InitDoge
@@ -614,12 +603,12 @@ Start:
 
 MainLoop:
     call WaitVBlank
-    call $FF80 ; DMA routine in HRAM
+    call DMARoutine
 
     ; move map
-    ldh a, ($43)
+    ldh a, (R_SCX)
     inc a
-    ldh ($43), a
+    ldh (R_SCX), a
 
     ld hl, CloudX
     call MoveCloud

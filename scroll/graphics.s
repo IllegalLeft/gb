@@ -10,13 +10,12 @@
 .BANK 0
 .SECTION "Graphics" FREE
 
-DMACopy:
-    ; https://exez.in/gameboy-dma
-    ld de, DMARoutine    ; destination of HRAM for DMA routine
-    rst $28
-    .DB $00, $0D    ; assembled DMA subroutine length
-		    ; then assembled DMA subroutine
-    .DB $F5, $3E, $C1, $EA, $46, $FF, $3E, $28, $3D, $20, $FD, $F1, $D9
+DMARoutineOriginal:
+    ld a, >OAMBuffer
+    ldh (R_DMA), a
+    ld a, $28       ; 5x40 cycles, approx. 200ms
+-   dec a
+    jr nz, -
     ret
 
 ScreenOn:

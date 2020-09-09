@@ -11,4 +11,6 @@ linemapaddr     DW  ; map addr for line to draw during vblank
 
 .ENDS
 
+.DEFINE OAMBuffer   $C100   EXPORT
+
 ; vim: filetype=wla

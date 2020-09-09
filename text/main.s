@@ -1,13 +1,15 @@
 
 ;==============================================================================
 ;
-; TEMPLATE
+; TEXT
 ;
 ; Samuel Volk, July 2018
 ;
-; Description
+; Displays some text.
 ;
 ;==============================================================================
+
+.INCLUDE "gb_hardware.i"
 
 .GBHEADER
     NAME "TEXT"
@@ -35,6 +37,10 @@
     MAP ' ' = 0
 .ENDA
 
+
+.DEFINE OAMBuffer   $C100
+.DEFINE DMARoutine  $FF80
+
 ;==============================================================================
 ; GAMEBOY HEADER
 ;==============================================================================
@@ -49,35 +55,12 @@
     jp $100
 .ORG $20    ; Reset $20
     jp $100
-.ORG $28    ; Reset $28	- Copy Data routine
-CopyData:
-    pop hl  ; pop return address off stack
-    push bc
-
-    ; get number of bytes to copy
-    ; hl contains the address of the bytes following the rst call
-    ldi a, (hl)
-    ld b, a
-    ldi a, (hl)
-    ld c, a
-
--   ldi a, (hl)	; start transfering data
-    ld (de), a
-    inc de
-    dec bc
-    ld a, b
-    or c
-    jr nz, -
-
-    ; all done
-    pop bc
-    jp hl
-    reti
-
+.ORG $28    ; Reset $28
+    jp $100
 .ORG $30    ; Reset $30
-    ;jp $100	; is overwritten above
+    jp $100
 .ORG $38    ; Reset $38
-    ;jp $100	; is overwritten above
+    jp $100
 .ORG $40    ; Vblank IRQ Vector
     reti
 .ORG $48    ; LCD IRQ Vector
@@ -193,21 +176,19 @@ ScreenOff:
     ldh ($40), a
     ret
 
+DMARoutineOriginal:
+    ld a, >OAMBuffer
+    ldh (R_DMA), a
+    ld a, $28		    ; 5x40 cycles, approx. 200ms
+-   dec a
+    jr nz, -
+    ret
+
 WaitVBlank:
     ld a, ($FF44)
     cp $91
     jr nz, WaitVBlank
     ret
-
-DMACopy:
-    ; https://exez.in/gameboy-dma
-    ld de, $FF80    ; destination of HRAM for DMA routine
-    rst $28
-    .DB $00, $0D    ; assembled DMA subroutine length
-		    ; then assembled DMA subroutine
-    .DB $F5, $3E, $C1, $EA, $46, $FF, $3E, $28, $3D, $20, $FD, $F1, $D9
-    ret
-
 
 ;==============================================================================
 ; START
@@ -239,7 +220,10 @@ Start:
     ld a, %00011011	; obj
     ldh ($48), a
 
-    call DMACopy ; set up DMA subroutine
+    ld hl, DMARoutineOriginal
+    ld de, DMARoutine
+    ld bc, _sizeof_DMARoutineOriginal
+    call MoveData
 
     ; setup screen
     ld a, %10010011

@@ -89,8 +89,10 @@ Start:
     ld a, %00011011	    ; obj
     ldh (R_OBP0), a
 
-    call DMACopy            ; set up DMA subroutine
-    call DMARoutine         ; clear OAM
+    ld hl, DMARoutineOriginal
+    ld de, DMARoutine
+    ld bc, _sizeof_DMARoutineOriginal
+    call MoveData
 
     ld a, %10010011         ; setup screen
     ldh (R_LCDC), a

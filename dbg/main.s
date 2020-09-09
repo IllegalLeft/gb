@@ -27,35 +27,12 @@
     jp $100
 .ORG $20    ; Reset $20
     jp $100
-.ORG $28    ; Reset $28	- Copy Data routine
-CopyData:
-    pop hl  ; pop return address off stack
-    push bc
-
-    ; get number of bytes to copy
-    ; hl contains the address of the bytes following the rst call
-    ldi a, (hl)
-    ld b, a
-    ldi a, (hl)
-    ld c, a
-
--   ldi a, (hl)	; start transfering data
-    ld (de), a
-    inc de
-    dec bc
-    ld a, b
-    or c
-    jr nz, -
-
-    ; all done
-    pop bc
-    jp hl
-    reti
-
+.ORG $28    ; Reset $28
+    jp $100
 .ORG $30    ; Reset $30
-    ;jp $100	; is overwritten above
+    jp $100
 .ORG $38    ; Reset $38
-    ;jp $100	; is overwritten above
+    jp $100
 .ORG $40    ; Vblank IRQ Vector
     reti
 .ORG $48    ; LCD IRQ Vector
@@ -75,6 +52,8 @@ CopyData:
 ; HRAM
 ;==============================================================================
 
+.DEFINE DMARoutine  $FF80
+
 .ENUM $FF8D
     Joypad	    DB
     JoypadOld	    DB
@@ -90,12 +69,40 @@ CopyData:
     CursorOffset    DB
 .ENDE
 
+.DEFINE OAMBuffer   $C100
+
 ;==============================================================================
 ; SUBROUTINES
 ;==============================================================================
 .BANK 0
 .SECTION "Subroutines" FREE
 ; Init Subroutines
+BlankData:
+    ; a	    value
+    ; hl    destination
+    ; bc    length/size
+    ld d, a	    ; will need later
+-   ldi (hl), a
+    dec bc
+    ld a, b
+    or c
+    ld a, d
+    jr nz, -
+    ret
+
+MoveData:
+    ; hl    source
+    ; de    destination
+    ; bc    length/size
+-   ldi a, (hl)
+    ld (de), a
+    inc de
+    dec bc
+    ld a, b
+    or c
+    jr nz, -
+    ret
+
 BlankSprites:
     ld hl, $8000
     ld bc, 4080
@@ -142,19 +149,6 @@ LoadTiles:
     jr nz, -
     ret
 
-MoveData:
-    ;hl  source
-    ;de  destination
-    ;bc  length/size
--   ldi a, (hl)
-    ld (de), a
-    inc de
-    dec bc
-    ld a, b
-    or c
-    jr nz, -
-    ret
-
 BlankMap:
     ld hl, $9800
     ld bc, 1024
@@ -190,13 +184,12 @@ ScreenOff:
     ldh (R_LCDC), a
     ret
 
-DMACopy:
-    ; https://exez.in/gameboy-dma
-    ld de, $FF80    ; destination of HRAM for DMA routine
-    rst $28
-    .DB $00, $0D    ; assembled DMA subroutine length
-		    ; then assembled DMA subroutine
-    .DB $F5, $3E, $C1, $EA, $46, $FF, $3E, $28, $3D, $20, $FD, $F1, $D9
+DMARoutineOriginal:
+    ld a, >OAMBuffer
+    ldh (R_DMA), a
+    ld a, $28		; 5x40 cycles, approx. 200ms
+-   dec a
+    jr nz, -
     ret
 
 ScanJoypad:
@@ -388,9 +381,14 @@ Start:
     xor a
     ldh (R_NR52), a
 
-    call BlankWRAM
-    call BlankOAM
-    call BlankSprites
+    ;xor a
+    ld hl, $C000
+    ld bc, $2000
+    call BlankData	; blank WRAM
+    ld hl, $8000
+    ld bc, $2000
+    call BlankData	; blank VRAM
+
     call LoadTiles
 
     call BlankMap
@@ -402,7 +400,10 @@ Start:
     ld a, %00011011	; obj
     ldh (R_OBP0), a
 
-    call DMACopy ; set up DMA subroutine
+    ld hl, DMARoutineOriginal
+    ld de, DMARoutine
+    ld bc, _sizeof_DMARoutineOriginal
+    call MoveData
 
     ; set some initial variables up
     ld a, $01

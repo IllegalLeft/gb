@@ -3,7 +3,6 @@
 .INCLUDE "hram.i"
 .INCLUDE "wram.i"
 
-.DEFINE OAM_Buffer $C100
 
 .BANK 0
 .ORG $150
@@ -28,7 +27,10 @@ Start:
     ld bc, $2000
     call BlankData	    ; blank VRAM
 
-    call DMACopy	    ; setup DMA Routine
+    ld hl, DMARoutineOriginal
+    ld de, DMARoutine
+    ld bc, _sizeof_DMARoutineOriginal
+    call MoveData
     call DMARoutine
 
     ld hl, invbg_tile_data  ; load tiles

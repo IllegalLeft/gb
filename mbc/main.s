@@ -14,6 +14,7 @@
 .INCLUDE "header.i"
 
 
+.DEFINE OAMBuffer   $C100
 .DEFINE DMARoutine  $FF80
 
 ;==============================================================================
@@ -21,13 +22,12 @@
 ;==============================================================================
 .BANK 0
 .SECTION "Subroutines" FREE
-DMACopy:
-    ; https://exez.in/gameboy-dma
-    ld de, DMARoutine    ; destination of HRAM for DMA routine
-    rst $28
-    .DB $00, $0D    ; assembled DMA subroutine length
-		    ; then assembled DMA subroutine
-    .DB $F5, $3E, $C1, $EA, $46, $FF, $3E, $28, $3D, $20, $FD, $F1, $D9
+DMARoutineOriginal:
+    ld a, >OAMBuffer
+    ldh (R_DMA), a
+    ld a, $28		; 5x40 cycles, approx. 200ms
+-   dec a
+    jr nz, -
     ret
 
 ; Init Subroutines
@@ -118,8 +118,11 @@ Start:
     ld a, %00011011	    ; obj
     ldh (R_OBP0), a
 
-    call DMACopy            ; set up DMA subroutine
-    call DMARoutine         ; clear OAM
+    ld hl, DMARoutineOriginal
+    ld de, DMARoutine
+    ld bc, _sizeof_DMARoutineOriginal
+    call MoveData	    ; move DMA Routine into HRAM
+    call DMARoutine
 
     ld a, $03
     call SwitchBank	    ; switch to bank 3

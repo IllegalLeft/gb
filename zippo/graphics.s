@@ -1,14 +1,14 @@
+.INCLUDE "gb_hardware.i"
 .INCLUDE "header.i"
 .INCLUDE "hram.i"
 
 .SECTION "GraphicsRoutines" FREE
-DMACopy:
-    ; https://exez.in/gameboy-dma
-    ld de, DMARoutine   ; destination of HRAM for DMA routine
-    rst $28
-    .DB $00, $0D        ; assembled DMA subroutine length
-                        ; then assembled DMA subroutine
-    .DB $F5, $3E, $C1, $EA, $46, $FF, $3E, $28, $3D, $20, $FD, $F1, $D9
+DMARoutineOriginal:
+    ld a, >OAM_Buffer
+    ldh (R_DMA), a
+    ld a, $28	    ; 5x40 cycles, approx. 200ms
+-   dec a
+    jr nz, -
     ret
 
 LoadScreen:
@@ -54,4 +54,4 @@ PrintStr:
 
 .ENDS
 
-;vim: set filetype=wla
+; vim: filetype=wla

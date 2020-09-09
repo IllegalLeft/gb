@@ -238,7 +238,10 @@ Start:
     ld hl, tapestryMap
     call LoadScreen
 
-    call DMACopy            ; set up DMA subroutine
+    ld hl, DMARoutineOriginal
+    ld de, DMARoutine
+    ld bc, _sizeof_DMARoutineOriginal
+    call MoveData
     call DMARoutine         ; clear OAM
 
     ld a, %10010011         ; setup screen
