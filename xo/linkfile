@@ -4,6 +4,7 @@ interrupts.o
 graphics.o
 strings.o
 music.o
+misc.o
 songs.o
 sgb.o
 

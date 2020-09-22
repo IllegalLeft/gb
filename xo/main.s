@@ -12,767 +12,9 @@
 .INCLUDE "cgb_hardware.i"
 .INCLUDE "header.i"
 .INCLUDE "palettes.i"
+.INCLUDE "wram.i"
+.INCLUDE "hram.i"
 
-; WRAM Variables
-.ENUM $C000 EXPORT
-    vbcounter:	DB		; counter for vblank
-    state:	DB		; 0 main menu, 1 xturn, 2 oturn, 3 end game
-    initiator:	DB		; holds player who started last
-    won:	DB
-    lost:	DB
-    tied:	DB
-    menucursor:	DB		; cursor for menus (line of menu)
-    cursorx:	DB		; 0-2
-    cursory:	DB		; 0-2
-    field:	DS 9		; field is 3x3, 0 empty, 1 x, 2 o
-    seed:	DB		; seed for random integer generator
-    menubgtile: DB		; tile index for menu bg tile
-.ENDE
-.DEFINE OAMbuffer $C100
-.STRUCT OAMentry
-    y		DB
-    x		DB
-    tile	DB
-    attr	DB
-.ENDST
-.ENUM OAMbuffer EXPORT
-    OAM:	INSTANCEOF OAMentry 40
-.ENDE
-.ENUM $C200
-    tilemapbuff	DS	20*18	; tilemap buffer
-.ENDE
-
-; HRAM constants
-.DEFINE DMARoutine	$FF80
-.DEFINE h_CGB	$8D
-.DEFINE h_SGB	$8E
-.ENUM $FF8D	; before this is after the DMA routine
-    CGB			DB	; is gameboy colour?
-    SGB			DB	; is super gameboy?
-    joypadStateNew	DB
-    joypadStateOld	DB
-    joypadStateDiff	DB
-.ENDE
-
-.DEFINE joy_a	    1 << 0
-.DEFINE joy_b	    1 << 1
-.DEFINE joy_select  1 << 2
-.DEFINE joy_start   1 << 3
-.DEFINE joy_right   1 << 4
-.DEFINE joy_left    1 << 5
-.DEFINE joy_up	    1 << 6
-.DEFINE joy_down    1 << 7
-
-
-;==============================================================================
-; SUBROUTINES
-;==============================================================================
-.SECTION "Subroutines" FREE
-
-; Init Subroutines
-BlankData:
-    ; a	    value
-    ; hl    destination
-    ; bc    length/size
-    ld d, a			; will need to retrieve later
--   ldi (hl), a
-    dec bc
-    ld a, b
-    or c
-    ld a, d
-    jp nz, -
-    ret
-
-MoveData:
-    ;hl  source
-    ;de  destination
-    ;bc  length/size
--   ldi a, (hl)
-    ld (de), a
-    inc de
-    dec bc
-    ld a, b
-    or c
-    jp nz, -
-    ret
-
-FillMapBuffer:
-    ; Fills the map buffer with a single tile
-    ; a	    tile to fill
-    ld d, a
-    ld hl, tilemapbuff
-    ld bc, 1024
--   ld a, d
-    ldi (hl), a
-    dec bc
-    ld a, b
-    or c
-    jp nz, -
-    ret
-
-LoadScreen:
-    ; hl    map source
-    ld de, $9800
-    ld c, $12
---  ld b, $14
--   ldi a, (hl)
-    ld (de), a
-    inc de
-    dec b
-    jp nz, -
-    ld a, 12
-    add e
-    ld e, a
-    ld a, 0
-    adc d
-    ld d, a
-    dec c
-    jp nz, --
-    ret
-
-
-UpdateScreen:
-    ; moves tilemapbuff to VRAM
-    ld hl, tilemapbuff
-    ld de, $9800
-    ld c, $12
---  ld b, $14
--   ldi a, (hl)
-    ld (de), a
-    inc de
-    dec b
-    jp nz, -
-    ld a, 12
-    add e
-    ld e, a
-    ld a, 0
-    adc d
-    ld d, a
-    dec c
-    jp nz, --
-    ret
-
-ScreenOn:
-    ldh a, (R_LCDC)
-    or %10000000
-    ldh (R_LCDC), a
-    ret
-
-ScreenOff:
-    halt    ; wait for VBlank
-    nop
-    ldh a, (R_LCDC)
-    xor %10000000
-    ldh (R_LCDC), a
-    ret
-
-SoundOn:
-    xor a
-    ldh (R_NR52), a
-    ret
-
-SoundOff:
-    ld a, $80
-    ldh (R_NR52), a
-    ret
-
-FadePause:
-    ld a, 2
--   halt
-    nop
-    call UpdateMusic
-    dec a
-    jp nz, -
-    ret
-
-FadeInRev:
-    ld a, %11111111
-    ldh (R_BGP), a
-    call FadePause
-    ld a, %11111110
-    ldh (R_BGP), a
-    call FadePause
-    ld a, %11111010
-    ldh (R_BGP), a
-    call FadePause
-    ld a, %11100100
-    ldh (R_BGP), a
-    call FadePause
-    ret
-
-FadeIn:
-    ld a, %00000000
-    ldh (R_BGP), a
-    call FadePause
-    ld a, %01000000
-    ldh (R_BGP), a
-    call FadePause
-    ld a, %10010100
-    ldh (R_BGP), a
-    call FadePause
-    ld a, %11100100
-    ldh (R_BGP), a
-    call FadePause
-    ret
-
-FadeOut:
-    ld a, %11100100
-    ldh (R_BGP), a
-    call FadePause
-    ld a, %10100100
-    ldh (R_BGP), a
-    call FadePause
-    ld a, %01010000
-    ldh (R_BGP), a
-    call FadePause
-    ld a, %00000000
-    ldh (R_BGP), a
-    call FadePause
-    ret
-
-
-FadeOutRev:
-    ld a, %11100100
-    ldh (R_BGP), a
-    call FadePause
-    ld a, %11111001
-    ldh (R_BGP), a
-    call FadePause
-    ld a, %11111110
-    ldh (R_BGP), a
-    call FadePause
-    ld a, %11111111
-    ldh (R_BGP), a
-    call FadePause
-    ret
-
-DMARoutineOriginal:
-    ld a, >OAMbuffer
-    ldh (R_DMA), a
-    ld a, $28		; 5x40 cycles, approx. 200ms
--   dec a
-    jr nz, -
-    ret
-
-DetectSystem:
-    ldh ($8D), a	; save startup value in accumulator
-    ld a, $30
-    ldh (R_P1), a	; reset joypad selector pins for test
-
-    ;MLT_REQ test
-    ld hl, MLT_REQ2P
-    call SGBSend
-    ld a, $30
-    ldh (R_P1), a
-    ldh a, (R_P1)
-    ldh a, (R_P1)
-    ldh a, (R_P1)
-    ld b, a
-    ld a, $20
-    ldh (R_P1), a
-    ld a, $10
-    ldh (R_P1), a
-    ld a, $30
-    ldh (R_P1), a
-    ldh a, (R_P1)
-    ldh a, (R_P1)
-    ldh a, (R_P1)
-    cp b
-    jr nz, @IsSGB
-
-@NotSGB:
-    ldh a, ($8D)
-    cp $01
-    jr z, @DMG
-    cp $FF
-    jr z, @MGB
-    jr @CGB
-@IsSGB:
-    ld hl, MLT_REQ1P
-    call SGBSend
-    ldh a, ($8D)
-    cp $01
-    jr z, @SGB
-    jr @SGB2
-
-@DMG:
-@MGB:
-    xor a
-    ldh (h_CGB), a
-    ldh (h_SGB), a
-    ret
-@CGB:
-    ld a, 1
-    ldh (h_CGB), a
-    xor a
-    ldh (h_SGB), a
-    ret
-@SGB:
-@SGB2:
-    ld a, 1
-    ldh (h_SGB), a
-    xor a
-    ldh (h_CGB), a
-    ret
-
-InitCursor:
-    ld a, $50	    ; tile #
-    ld e, 4	    ; 4 sprites
-    ld hl, OAMbuffer; starting of OAM buffer
-
-    ; tile number
--   inc hl	    ; skip y
-    inc hl	    ; skip x
-    ldi (hl), a
-    inc hl	    ; and skip attr/flags
-    inc a	    ; next tile
-    dec e
-    jp nz, -
-
-    ld de, $3844
-    call CursorMove ; sets up coordinates
-    ret
-
-CursorMove:
-    ; d	    y ordinate
-    ; e	    x ordinate
-    ld a, e
-    ldh ($90), a    ; store x ord for later
-    ld hl, OAMbuffer; starting of OAM buffer
-    ;ld d, 16	    ; y ord
-    ld b, 2	    ; y
---  ldh a, ($90)    ; x ord
-    ld e, a
-    ld c, 2	    ; x
--   ld a, d
-    ldi (hl), a
-    ld a, e
-    ldi (hl), a
-    inc hl
-    inc hl
-    ld a, 8
-    add e
-    ld e, a
-    dec c
-    jp nz, -
-    ld a, 8
-    add d
-    ld d, a
-    dec b
-    jp nz, --    
-    ret
-
-CursorUpdate:
-    ; Updates cursor sprites based on cursorx and cursory
-    ld a, (cursory)
-    cp 0
-    jp z, +	    ; don't need to multiply y as it is 0
-    ld c, a
-    xor a
--   add 3
-    dec c
-    jp nz, -
-+   ld c, a
-    ld a, (cursorx)
-    add c
-    rla		    ; x2 since it's words
-    ld hl, CursorPos
-    ld d, 0
-    ld e, a
-    add hl, de
-    ldi a, (hl)	    ; first byte
-    ld e, a
-    ld d, (hl)	    ; second byte
-    call CursorMove
-    ret
-
-DrawMenuBox:
-.DEFINE tile_empty  0
-.DEFINE tile_boxtl  $A6
-.DEFINE tile_boxtr  $A7
-.DEFINE tile_boxbr  $A8
-.DEFINE tile_boxbl  $A9
-.DEFINE tile_boxt   $AA
-.DEFINE tile_boxl   $AB
-.DEFINE tile_boxb   $AC
-.DEFINE tile_boxr   $AD
-    ; Draws a box with the screen in the top left of the map
-    ; b	    x of top left of box
-    ; c	    y of top left of box
-    ; d	    width
-    ; e	    height
-    ld hl, tilemapbuff+$53
-    ld de, $6
-    ld b, 5	    ; y of box
-    ; first row
-    ld c, 14	    ; x of box
-    ld a, tile_boxtl
-    ldi (hl), a
-    dec c
--   ld a, tile_boxt
-    ldi (hl), a
-    dec c
-    ld a, c
-    cp 1
-    jr nz, -
-    ld a, tile_boxtr
-    ldi (hl), a
-    dec c
-    add hl, de	    ; next row
-
-    ; middle rows
---  ld c, 14
--   ld a, c
-    cp 14
-    jr z, @right
-    cp 1
-    jr z, @left
-@empty:
-    ld a, tile_empty
-    jr +
-@left:
-    ld a, tile_boxl
-    jr +
-@right:
-    ld a, tile_boxr
-+   ldi (hl), a
-    dec c
-    jr nz, -
-    add hl, de
-    dec b
-    ld a, b
-    cp 1
-    jr nz, --
-    
-    ;last row
-    ld c, 14
-    ld a, tile_boxbl
-    ldi (hl), a
-    dec c
--   ld a, tile_boxb
-    ldi (hl), a
-    dec c
-    ld a, c
-    cp 1
-    jr nz, -
-    ld a, tile_boxbr
-    ldi (hl), a
-    ;dec c
-    ret
-
-PrintStr:
-    ; Prints $00 terminated string to VRAM tile map.
-    ; hl    source of string ending in $00
-    ; de    tile destination (somewhere in VRAM tilemap probably)
--   ldi a, (hl)
-    cp 0
-    ret z
-    ld (de), a
-    inc de
-    jp -
-
-PrintInt:
-    ; Prints 1 byte to VRAM tilemap three digits/tiles
-    ; a	    byte to print out
-    ; de    tile destination (somewhere in VRAM tilemap)
-    daa
-    ld b, a	    ; store for later
-    and $F0
-    swap a
-    add numberOffset
-    ld (de), a
-    inc de
-    ld a, b
-    and $0F	    ; bottom
-    add numberOffset
-    ld (de), a
-    ret
-
-
-ReadInput:
-    ld a, (joypadStateNew)	; move old keypad state
-    ld (joypadStateOld), a
-
-    ld a, $20	    ; select P14
-    ld ($FF00), a
-    ld a, ($FF00)   ; read pad
-    ld a, ($FF00)   ; a bunch of times
-    cpl		    ; active low so flip 'er 
-    and $0f	    ; only need last 4 bits
-    swap a
-    ld b, a
-    ld a, $10	    ; select P15
-    ld ($FF00), a   ;
-    ld a, ($FF00)
-    ld a, ($FF00)
-    cpl
-    and $0F	    ; only need last 4 bits
-    or b	    ; put a and b together
-    ld (joypadStateNew), a ; store into 0page for later
-
-    ld b, a			; Find difference in two keystates
-    ld a, (joypadStateOld)
-    xor b
-    ld b, a
-    ld a, (joypadStateNew)
-    and b
-    ld (joypadStateDiff), a
-
-    ld a, $30	    ; reset joypad
-    ld ($FF00), a
-    ret
-
-HandleInput:
-    ld a, (joypadStateDiff)
-    ld b, a
-    and joy_right
-    jp z, @noright
-    ld a, (cursorx)
-    cp 2
-    jp z, @noright
-    inc a
-    ld (cursorx), a
-    call CursorUpdate
-@noright:
-    ld a, b
-    and joy_left
-    jp z, @noleft
-    ld a, (cursorx)
-    cp 0
-    jp z, @noleft
-    dec a
-    ld (cursorx), a
-    call CursorUpdate
-@noleft:
-    ld a, b
-    and joy_up
-    jp z, @noup
-    ld a, (cursory)
-    cp 0
-    jp z, @noup
-    dec a
-    ld (cursory), a
-    call CursorUpdate
-@noup:
-    ld a, b
-    and joy_down
-    jp z, @nodown
-    ld a, (cursory)
-    cp 2
-    jp z, @nodown
-    inc a
-    ld (cursory), a
-    call CursorUpdate
-@nodown:
-    ld a, b
-    and joy_a
-    jp z, @noa
-    ld hl, state    ; is it player's turn?
-    ld a, (hl)
-    cp 1
-    jp nz, @noa	    ; jump if it isn't
-    ld a, (cursory)
-    cp 0
-    jp z, +	; you don't need to multiply it if it's 0
-    ld c, a
-    xor a
--   add 3
-    dec c
-    jp nz, -
-+   ld c, a
-    ld a, (cursorx)
-    add c	; offset for cursor square in a
-    ld hl, field
-    ld d, 0
-    ld e, a
-    add hl, de	; add offset to find selected field spot
-    ld a, (hl)
-    cp 0
-    jp z, @place
-@noa:
-    ret
-@place:
-    ld b, 1
-    push hl	    ; need to save hl (offset for field spot)
-    call DrawFieldTile2
-    pop hl
-    ld (hl), 1	    ; Xs are 1
-    ld hl, state
-    ld (hl), 2	    ; Os turn
-    ret
-
-DrawFieldTile2:
-    ; b    field value
-    ; de    tile to change
-.DEFINE empty_tile	$42
-.DEFINE o_tile		$46
-.DEFINE	x_tile		$4A
-    
-    ld hl, FieldAddr
-    sla e	    ; x2 because it's words and not bytes
-    add hl, de
-    ldi a, (hl)	    ; low byte of address
-    ld e, a
-    ld a, (hl)	    ; high byte of address
-    ld d, a
-
-    ld a, b
-
-    cp 1		; is the tile an x?
-    jp nz, +
-    ld b, x_tile
-    jp ++
-+   cp 2		; is the tile an o?
-    jp nz, +
-    ld b, o_tile
-    jp ++
-+   ld b, empty_tile	; anything else will be empty
-++
-    halt    ; wait for VBlank
-    nop
-    ld l, e
-    ld h, d
-    ld c, 4
--   ld (hl), b
-    inc hl
-    inc b
-    dec c
-    ld a, c
-    cp 2
-    jp nz, +
-    ld de, $1E
-    add hl, de
-+   cp 0
-    jp nz, -
-    ret
-
-RandomInt:
-    ld a, (seed)
-    sla a
-    jp nc, +
-    xor %00011101
-+   ld (seed), a
-    ret
-
-CPUTurn:
--   call RandomInt  ; get a random spot
-    and $0F
-    cp 9
-    jp nc, -
-    ld hl, field    ; is it occupied?
-    ld d, 0
-    ld e, a
-    add hl, de
-    ld a, (hl)
-    cp 0
-    jp nz, -	    ; ...then pick another!
-    ld (hl), 2	    ; place
-    ld b, 2
-    ;ld de, ..	; already loaded up to go!
-    call DrawFieldTile2
-    ld a, 1
-    ld (state), a   ; players turn now
-    ret
-
-CheckforWin:
-    ; This function will return 1 on x win and 2 on o win and 3 for tie
-    ; return value in accumulator
-
-    ; horizontal wins
-    ld hl, field
-    ld b, 3	    ; three rows
---  ld c, 3	    ; three spots per row
-    ldi a, (hl)	    ; load the first one
-    jp +
--   and (hl)	    ; but and it with the next two for result
-    inc hl
-+   dec c
-    jp nz, -
-    and 3	    ; row is finished check, compare result
-    jp nz, @hwin    ; handle win
-    dec b	    ; next row
-    jp nz, --
-    jp @nohwin
-@hwin:
-    ret		    ; acc. has the winning side already
-@nohwin:
-
-    ; vertical wins
-    ld hl, field
-    ld de, 3	    ; column items are 3 bytes apart
-    ld b, 3	    ; three columns
---  ld c, 3	    ; three spots
-    ld a, (hl)	    ; load first one
-    jp +
--   and (hl)	    ; but and it with the next two for result
-+   add hl, de
-    dec c
-    jp nz, -
-    and 3	    ; column is finished check, compare result
-    jp nz, @vwin    ; handle win
-    dec b	    ; next column
-    jp z, @novwin   ; b = 0 so we are done
-    bit 0, b
-    jp nz, @col2    ; b must be odd
-@col1:
-    ld hl, (field+1)
-    jp @coladdrpicked
-@col2:
-    ld hl, (field+2)
-@coladdrpicked:
-    xor a
-    cp b
-    jp nz, --	    ; start new column
-    jp @novwin
-@vwin:
-    ret		    ; acc. has the winning side already
-@novwin:
-
-    ; diagonal wins
-    ld hl, field	; top left to bottom right
-    ld a, (hl)
-    inc l
-    inc l
-    inc l
-    inc l
-    and (hl)
-    inc l
-    inc l
-    inc l
-    inc l
-    and (hl)
-    jp nz, @diagonalwin
-    ; top right to bottom left
-    ld hl, (field+2)	; top left to bottom right
-    ld a, (hl)
-    inc l
-    inc l
-    and (hl)
-    inc l
-    inc l
-    and (hl)
-    jp nz, @diagonalwin
-    jp @diagonalnowin
-@diagonalwin:
-    ret		    ; acc. has winning side
-@diagonalnowin:
-
-    ; check for filled field (tie)
-    ld hl, field
-    ld c, 9
--   ldi a, (hl)
-    and $0F	    ; just to get the Z flag really
-    jp z, @notie
-    dec c
-    jp nz, -
-@tie:
-    ld a, 3	    ; tie
-    ret
-@notie:
-    xor a
-    ret
-
-.ENDS
 
 ;==============================================================================
 ; START
@@ -787,9 +29,10 @@ Start:
     ld a, %000000001 ; setup interrupts
     ldh (R_IE), a
 
-    ; wait for vblank
-    halt
-    nop
+@waitVblank:
+    ldh a, (R_LY)
+    cp 144
+    jr nz, @waitVblank
     ; turn screen off
     call ScreenOff
 
@@ -869,6 +112,12 @@ Start:
 
 SoftReset:
     call ScreenOff
+    xor a
+    ld (games), a		    ; blank some variables in wram
+    ld (gamesplayed), a
+    ld (won), a
+    ld (lost), a
+    ld (tied), a
     ; font tiles
     ld hl, Tiles
     ld de, $8800
@@ -926,20 +175,19 @@ TitleScreen:
 
     call ReadInput
     ld a, (joypadStateNew)
-    cp (joy_a | joy_select)
+    cp (JOY_A | JOY_SELECT)
     jp z, Credits
     ld a, (joypadStateDiff)
-    and joy_start
+    and JOY_START
     jr nz, MainMenu
     jr @loop
 
 MainMenu:
     call ScreenOff
+    ld a, $AE
     ld hl, tilemapbuff		    ; blank map buffer
     ld bc, 1024
     call BlankData
-    ld a, $AE
-    call FillMapBuffer
 
     xor a
     ld (menucursor), a
@@ -974,31 +222,12 @@ MainMenu:
     call DMARoutine
     call UpdateMusic
 
-    ; rotate bg tile
-    ld a, (vbcounter)
-    and %00000011
-    cp $3
-    jr nz, ++
-    ld a, (menubgtile)		; load tile index # and increment
-    inc a
-    cp $4
-    jr nz, +
-    xor a
-+   ld (menubgtile), a
-    ld hl, menubg_data		; move new tile data into tile memory
-    swap a			; a*16 into bc
-    ld c, a
-    ld b, 0
-    add hl, bc
-    ld de, $8000+($AE*16)
-    ld bc, 16
-    call MoveData
-++
+    call ScrollBG
     
     call ReadInput
     ld a, (joypadStateDiff)
     ld b, a
-    and (joy_up | joy_down)
+    and (JOY_UP | JOY_DOWN)
     jr z, +
     ld a, (menucursor)
     cpl
@@ -1013,24 +242,23 @@ MainMenu:
     ld (hl), a
 
 +   ld a, b
-    and (joy_a | joy_start)
+    and (JOY_A | JOY_START)
     jr z, +
     ld a, (menucursor)
     cp 0
-    jp z, GameSetup	; New Game
+    jp z, GameSelectSetup	; New Game
     cp 1
-    jp z, Options	; Options
+    jp z, Options		; Options
     ld a, b
 
 +   jr @loop
 
 Options:
     call ScreenOff
+    ld a, $AE
     ld hl, tilemapbuff		    ; blank map buffer
     ld bc, 1024
     call BlankData
-    ld a, $AE
-    call FillMapBuffer
 
     xor a
     ld (menucursor), a
@@ -1065,31 +293,12 @@ Options:
     call DMARoutine
     call UpdateMusic
 
-    ; rotate bg tile
-    ld a, (vbcounter)
-    and %00000011
-    cp $3
-    jr nz, ++
-    ld a, (menubgtile)		; load tile index # and increment
-    inc a
-    cp $4
-    jr nz, +
-    xor a
-+   ld (menubgtile), a
-    ld hl, menubg_data		; move new tile data into tile memory
-    swap a			; a*16 into bc
-    ld c, a
-    ld b, 0
-    add hl, bc
-    ld de, $8000+($AE*16)
-    ld bc, 16
-    call MoveData
-++
+    call ScrollBG
 
     call ReadInput
     ld a, (joypadStateDiff)
     ld b, a
-    and (joy_up | joy_down)
+    and (JOY_UP | JOY_DOWN)
     jr z, +
     ld a, (menucursor)
     cpl
@@ -1101,10 +310,10 @@ Options:
 .ENDR
     add $40
     ld hl, OAMbuffer
-    ld  (hl), a
+    ld (hl), a
 
 +   ld a, b
-    and (joy_a | joy_start)
+    and (JOY_A | JOY_START)
     jr z, +
     ld a, (menucursor)
     cp 0
@@ -1129,17 +338,115 @@ Options:
     jp z, MainMenu
 
 +   ld a, b
-    and joy_start
+    and JOY_START
     jp nz, MainMenu
 
     jp @loop
     
+GameSelectSetup:
+    call ScreenOff
+    ld a, $AE
+    ld hl, tilemapbuff
+    ld bc, 1024
+    call BlankData		    ; blank map data
+
+    xor a
+    ld (menucursor), a
+    ld a, $10
+    ld (cursorx), a
+    ld (cursory), a
+
+    call DrawMenuBox
+    ; game select text
+    ld hl, TextGameSelect0	    ; Out of how many games?
+    ld de, tilemapbuff+($14*5)+5
+    call PrintStr
+    ld hl, TextGameSelect1	    ; 1 game
+    ld de, tilemapbuff+($14*6)+6
+    call PrintStr
+    ld hl, TextGameSelect2	    ; 3 games
+    ld de, tilemapbuff+($14*7)+6
+    call PrintStr
+    ld hl, TextGameSelect3	    ; 5 games
+    ld de, tilemapbuff+($14*8)+6
+    call PrintStr
+
+    ; setup cursor OAM
+    ld hl, OAMbuffer
+    ld a, $40
+    ldi (hl), a
+    ld a, $2A
+    ldi (hl), a
+    ld a, $A5
+    ldi (hl), a
+
+    call UpdateScreen
+    call ScreenOn
+@loop:
+    halt
+    nop
+
+    call DMARoutine
+    call UpdateMusic
+
+    call ScrollBG
+
+    call ReadInput
+    ld a, (joypadStateDiff)
+    ld b, a
+    and (JOY_UP | JOY_DOWN)
+    jr z, @nocursormove
+    and JOY_UP
+    jr z, +
+    ld a, (menucursor)
+    and a
+    jr z, ++
+    dec a
+    jr ++
++   ;and JOY_DOWN
+    ld a, (menucursor)
+    inc a
+++  
+    ; limit menucursor to 0-2
+    cp 3
+    jr c, +
+    ld a, 2
++   ld (menucursor), a
+    
+    ; cursor.y = menucursor*8 + $40
+    sla a
+    sla a
+    sla a
+    add $40
+    ld hl, OAMbuffer
+    ld (hl), a
+@nocursormove:
+
+    ld a, b
+    and (JOY_A | JOY_START)
+    jr z, @noselect
+    ld a, (menucursor)
+    cp 0
+    jr nz, +
+    ld a, 1		    ; best out of 1
+    jr ++
++   cp 1
+    jr nz, +
+    ld a, 3		    ; best out of 3
+    jr ++
++   cp 2
+    jr nz, +
+    ld a, 5		    ; best out of 5
+++  ld (games), a
+    call FadeOut
+    jr GameSetup
+@noselect:
+    jp @loop
 
 GameSetup:
     ldh a, (R_LCDC)	    ; toggle objs
     res 1, a
     ldh (R_LCDC), a
-    call FadeOut
     call ScreenOff
 
     xor a
@@ -1261,10 +568,10 @@ EndGame:
     adc 1
     daa	; bcd is bae
     ld (won), a
-    halt    ; wait for VBlank
+    halt		    ; wait for VBlank
     nop
-    ld hl, TextWin
-    ld de, $9826
+    ld hl, TextRoundWon
+    ld de, $9825
     call PrintStr
     jp @end
 @loss:
@@ -1273,10 +580,10 @@ EndGame:
     adc 1
     daa
     ld (lost), a
-    halt    ; wait for VBlank
+    halt		    ; wait for VBlank
     nop
-    ld hl, TextLose
-    ld de, $9826
+    ld hl, TextRoundLost
+    ld de, $9825
     call PrintStr
     jp @end
 @tie:
@@ -1285,30 +592,48 @@ EndGame:
     adc 1
     daa
     ld (tied), a
-    halt		; wait for VBlank
+    halt		    ; wait for VBlank
     nop
-    ld hl, TextTie
-    ld de, $9826
+    ld hl, TextRoundTied
+    ld de, $9825
     call PrintStr
 @end:
+    ld hl, gamesplayed	    ; increment games played
+    inc (hl)
     ld de, $0000
     call CursorMove
-    halt		; wait for VBlank
-    nop
-    call DMARoutine
-
 @endloop:
     halt
     nop
-
+    call DMARoutine
     call UpdateMusic
     call ReadInput
     
     ld a, (joypadStateDiff)
-    and (joy_a | joy_b | joy_start | joy_select)
-    jp z, @endloop
+    and (JOY_A | JOY_B | JOY_START | JOY_SELECT)
+    jr z, @endloop
+
     call FadeOut
-    jp SoftReset
+    ; figure out if we need another round
+    ld a, (games)
+    sra a
+    add 1		; games to win = games/2+1
+    ld hl, won
+    cp (hl)
+    jp z, SoftReset
+    inc hl
+    cp (hl)
+    jp z, SoftReset
+    inc hl
+    cp (hl)
+    jp z, SoftReset
+    ; have we played enough games since there's no clear winner/loser?
+    ld a, (gamesplayed)
+    ld b, a
+    ld a, (games)
+    cp b		; games - gamesplayed
+    jp z, SoftReset
+    jp GameSetup	; else, new round
 
 
 Credits:

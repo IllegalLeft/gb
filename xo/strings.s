@@ -39,6 +39,29 @@ TextOptions0:
 TextOptions1:
 .ASC "EXIT@"
 
+TextGameSelect0:
+.ASC "BEST OUT OF@"
+TextGameSelect1:
+.ASC "1 GAME@"
+TextGameSelect2:
+.ASC "3 GAMES@"
+TextGameSelect3:
+.ASC "5 GAMES@"
+
+TextPause0:
+.ASC "PAUSE@"
+TextPause1:
+.ASC "CONTINUE@"
+TextPause2:
+.ASC "QUIT@"
+
+TextRoundWon:
+.ASC "ROUND WON@"
+TextRoundLost:
+.ASC "ROUND LOST@"
+TextRoundTied:
+.ASC "ROUND TIED@"
+
 Credits1a:
 .ASC "CODE  ART  MUSIC@"
 Credits1b:
