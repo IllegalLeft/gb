@@ -136,7 +136,7 @@ HandleInput:
     ldh a, (R_SCY)          ;
     sub (3)*8               ; ...up to here
 
-+   srl a                   ; shift left to divide by 8
++   srl a                   ; shift right to divide by 8
     srl a                   ;
     srl a                   ;
     ld c, a
